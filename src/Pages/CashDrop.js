@@ -76,7 +76,7 @@ function CashDrop() {
   };
 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     
     // Prevent selecting prior day's dates
     if (name === 'date') {
@@ -91,10 +91,14 @@ function CashDrop() {
       }
     }
     
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' || name === 'cashReceivedOnReceipt' ? parseFloat(value) || 0 : value,
-    }));
+    // Parse numeric values for numeric fields
+    const numericFields = ['startingCash', 'cashReceivedOnReceipt', 'pennies', 'nickels', 'dimes', 'quarters', 'halfDollars', 'ones', 'twos', 'fives', 'tens', 'twenties', 'fifties', 'hundreds'];
+    if (numericFields.includes(name)) {
+      const numValue = parseFloat(value) || 0;
+      setFormData(prev => ({ ...prev, [name]: numValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const calculateTotalCash = () => DENOMINATION_CONFIG.reduce((acc, d) => acc + (formData[d.field] * d.value), 0).toFixed(2);
@@ -190,7 +194,7 @@ function CashDrop() {
   if (loading) return <div className="h-screen flex items-center justify-center" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>Initializing Terminal...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '12px', color: COLORS.gray }}>
+    <div className="min-h-screen bg-gray-50 p-3 md:p-6" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '14px', color: COLORS.gray }}>
       
       {/* Status Message */}
       {statusMessage.show && (
@@ -199,7 +203,7 @@ function CashDrop() {
           statusMessage.type === 'success' ? 'bg-green-100 border-l-4 border-green-500' : 
           'bg-blue-100 border-l-4 border-blue-500'
         }`}>
-          <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`}>
+          <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`} style={{ fontSize: '14px' }}>
             {statusMessage.text}
           </p>
         </div>
@@ -207,71 +211,78 @@ function CashDrop() {
 
       <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4" style={{ backgroundColor: COLORS.magenta }}>
-          <h2 className="text-white font-black italic tracking-widest text-center uppercase" style={{ fontSize: '24px' }}>CashDrop Terminal</h2>
+          <h2 className="text-white font-black tracking-widest text-center uppercase" style={{ fontSize: '24px' }}>CashDrop Terminal</h2>
         </div>
 
-        <div className="p-8">
-          {/* Section 1: Top Bar Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 p-4 bg-gray-50 rounded-lg">
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Employee</label>
-              <input type="text" value={formData.employeeName} readOnly className="p-2 text-sm bg-transparent border-b font-bold" style={{ fontSize: '12px' }} />
+        <div className="p-4 md:p-8">
+          {/* Section 1: Top Bar Details - Split into two divs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8 p-4 bg-gray-50 rounded-lg">
+            {/* Left Div: Input Fields */}
+            <div className="space-y-3">
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Shift Number</label>
+                <input type="text" name="shiftNumber" value={formData.shiftNumber} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 focus:border-pink-600 outline-none" style={{ fontSize: '14px' }} />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Register Number</label>
+                <input type="text" name="workStation" value={formData.workStation} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 focus:border-pink-600 outline-none" style={{ fontSize: '14px' }} />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Starting Cash</label>
+                <input type="text" name="startingCash" value={formData.startingCash} readOnly={!isAdmin} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 font-bold" style={{ fontSize: '14px', color: COLORS.magenta }} />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.magenta, fontSize: '14px' }}>Cash Received on Receipt</label>
+                <input type="text" name="cashReceivedOnReceipt" value={formData.cashReceivedOnReceipt} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.magenta }} />
+              </div>
             </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Shift</label>
-              <input type="text" name="shiftNumber" value={formData.shiftNumber} onChange={handleChange} className="p-2 text-sm bg-transparent border-b" style={{ fontSize: '12px' }} />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Register</label>
-              <input type="text" name="workStation" value={formData.workStation} onChange={handleChange} className="p-2 text-sm bg-transparent border-b" style={{ fontSize: '12px' }} />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Date</label>
-              <input type="date" name="date" value={formData.date} onChange={handleChange} max={new Date().toISOString().slice(0, 10)} className="p-2 text-sm bg-transparent border-b" style={{ fontSize: '12px' }} />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Starting Cash</label>
-              <input type="number" name="startingCash" value={formData.startingCash} readOnly={!isAdmin} onChange={handleChange} className="p-2 text-sm bg-transparent border-b font-bold" style={{ fontSize: '12px', color: COLORS.magenta }} />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.magenta }}>Cash Received on Receipt</label>
-              <input type="number" name="cashReceivedOnReceipt" value={formData.cashReceivedOnReceipt} onChange={handleChange} className="p-2 text-sm bg-transparent border-b font-bold focus:border-pink-600 outline-none" style={{ fontSize: '12px', color: COLORS.magenta }} />
+            
+            {/* Right Div: Display Only Fields */}
+            <div className="space-y-3">
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Employee</label>
+                <div className="p-2 bg-transparent border-b border-gray-300 font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{formData.employeeName}</div>
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Date</label>
+                <input type="date" name="date" value={formData.date} onChange={handleChange} max={new Date().toISOString().slice(0, 10)} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.gray }} />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 items-start">
             {/* Input Column */}
-            <div className="bg-white border rounded-lg p-6">
-              <h3 className="font-black uppercase mb-6 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>1. Register Cash Count</h3>
+            <div className="bg-white border rounded-lg p-4 md:p-6">
+              <h3 className="font-black uppercase mb-4 md:mb-6 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>1. Register Cash Count</h3>
               <div className="space-y-3">
                 {DENOMINATION_CONFIG.map(d => (
                   <div key={d.field} className="flex justify-between items-center">
-                    <span className="text-xs font-bold" style={{ color: COLORS.gray }}>{d.display}</span>
-                    <input type="number" name={d.field} value={formData[d.field]} onChange={handleChange} className="w-20 p-1 border rounded text-right text-sm" min="0" style={{ fontSize: '12px' }} />
+                    <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>{d.display}</span>
+                    <input type="text" name={d.field} value={formData[d.field]} onChange={handleChange} className="w-20 p-1 border rounded text-right" style={{ fontSize: '14px' }} />
                   </div>
                 ))}
               </div>
-              <div className="mt-8 pt-4 border-t space-y-2">
-                <div className="flex justify-between text-xs"><span>Drawer Total:</span> <span className="font-bold">${calculateTotalCash()}</span></div>
+              <div className="mt-6 md:mt-8 pt-4 border-t space-y-2">
+                <div className="flex justify-between" style={{ fontSize: '14px' }}><span>Drawer Total:</span> <span className="font-bold">${calculateTotalCash()}</span></div>
               </div>
             </div>
 
             {/* Auto Drop Column */}
-            <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-6">
-              <h3 className="font-black uppercase mb-6 tracking-widest border-b border-blue-100 pb-2" style={{ fontSize: '18px', color: COLORS.magenta }}>2. Suggested Cash Drop</h3>
+            <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 md:p-6">
+              <h3 className="font-black uppercase mb-4 md:mb-6 tracking-widest border-b border-blue-100 pb-2" style={{ fontSize: '18px', color: COLORS.magenta }}>2. Suggested Cash Drop</h3>
               <div className="space-y-2">
                 {cashDropDenominations ? DENOMINATION_CONFIG.map(d => cashDropDenominations[d.field] > 0 && (
                   <div key={d.field} className="flex justify-between p-2 bg-white rounded border border-blue-50">
-                    <span className="text-[10px] font-bold uppercase" style={{ color: COLORS.gray }}>{d.display}</span>
-                    <span className="text-sm font-black" style={{ color: COLORS.magenta }}>x {cashDropDenominations[d.field]}</span>
+                    <span className="text-xs font-bold uppercase" style={{ color: COLORS.gray, fontSize: '14px' }}>{d.display}</span>
+                    <span className="font-black" style={{ color: COLORS.magenta, fontSize: '14px' }}>x {cashDropDenominations[d.field]}</span>
                   </div>
-                )) : <p className="text-center text-gray-300 text-xs py-20 italic">Enter amounts to calculate...</p>}
+                )) : <p className="text-center text-gray-300 py-20 italic" style={{ fontSize: '14px' }}>Enter amounts to calculate...</p>}
                 <div className="mt-4 pt-4 border-t space-y-2">
-                  <div className="flex justify-between text-xs" style={{ color: COLORS.yellowGreen }}>
+                  <div className="flex justify-between" style={{ color: COLORS.yellowGreen, fontSize: '14px' }}>
                     <span>Net Drop:</span> 
                     <span className="font-black">${calculateDropAmount()}</span>
                   </div>
-                  <div className="flex justify-between text-xs" style={{ color: COLORS.lightPink }}>
+                  <div className="flex justify-between" style={{ color: COLORS.lightPink, fontSize: '14px' }}>
                     <span>Variance:</span> 
                     <span className="font-black">${calculateVariance()}</span>
                   </div>
@@ -280,20 +291,20 @@ function CashDrop() {
             </div>
 
             {/* Image & Submit Column */}
-            <div className="space-y-6">
-              <div className="bg-white border rounded-lg p-6">
-                <h3 className="font-black uppercase mb-6 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>3. Cash Drop Receipt</h3>
-                <label className={`group flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all ${labelImage ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-pink-500'}`}>
+            <div className="space-y-4 md:space-y-6">
+              <div className="bg-white border rounded-lg p-4 md:p-6">
+                <h3 className="font-black uppercase mb-4 md:mb-6 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>3. Cash Drop Receipt</h3>
+                <label className={`group flex flex-col items-center justify-center w-full h-32 md:h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all ${labelImage ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-pink-500'}`}>
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <p className="text-sm font-bold" style={{ color: COLORS.gray }}>{labelImage ? "✅ Image Ready" : "Upload Cash Drop Receipt"}</p>
-                    <p className="text-[10px] mt-1" style={{ color: COLORS.gray }}>{labelImage ? labelImage.name : "PNG, JPG or JPEG"}</p>
+                    <p className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>{labelImage ? "✅ Image Ready" : "Upload Cash Drop Receipt"}</p>
+                    <p className="mt-1" style={{ color: COLORS.gray, fontSize: '14px' }}>{labelImage ? labelImage.name : "PNG, JPG or JPEG"}</p>
                   </div>
                   <input type="file" className="hidden" onChange={(e) => setLabelImage(e.target.files[0])} accept="image/*" />
                 </label>
               </div>
 
               {/* Notes/Comments Field */}
-              <div className="bg-white border rounded-lg p-6">
+              <div className="bg-white border rounded-lg p-4 md:p-6">
                 <h3 className="font-black uppercase mb-4 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>Notes/Comments</h3>
                 <textarea 
                   name="notes"
@@ -302,20 +313,20 @@ function CashDrop() {
                   rows="4"
                   className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 outline-none"
                   placeholder="Enter any notes or comments about this cash drop..."
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '14px' }}
                 />
               </div>
 
               {isSubmitValid() ? (
-                <button onClick={handleSubmit} className="w-full py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}>
+                <button onClick={handleSubmit} className="w-full py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '18px' }}>
                   Finalize Cash Drop
                 </button>
               ) : (
                 <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
-                  <p className="text-[10px] font-black text-red-500 uppercase leading-relaxed">
+                  <p className="font-black text-red-500 leading-relaxed" style={{ fontSize: '14px' }}>
                     {!labelImage && "• Missing Cash Drop Receipt Image"}<br/>
                     {parseFloat(calculateDropAmount()) <= 0 && "• Drop Amount must be positive"}<br/>
-                    {formData.workStation === '' && "• Register Numberis required"}<br/>
+                    {formData.workStation === '' && "• Register Number is required"}<br/>
                     {formData.shiftNumber === '' && "• Shift Number is required"}<br/>
                     {formData.startingCash === '' && "• Starting Cash is required"}<br/>
                     {formData.cashReceivedOnReceipt === '' && "• Cash Received on Receipt is required"}<br/>

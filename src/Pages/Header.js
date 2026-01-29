@@ -69,7 +69,7 @@ function Header() {
                     statusMessage.type === 'success' ? 'bg-green-100 border-l-4 border-green-500' : 
                     'bg-blue-100 border-l-4 border-blue-500'
                 }`} style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
-                    <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`} style={{ fontSize: '12px' }}>
+                    <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`} style={{ fontSize: '14px' }}>
                         {statusMessage.text}
                     </p>
                 </div>
@@ -84,9 +84,6 @@ function Header() {
                             <Link to="/cd-dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
                             {isAdmin && (
                                 <Link to="/dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Admin Dashboard</Link>
-                            )}
-                            {isAdmin && (
-                                <Link to="/register" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Register</Link>
                             )}
                             {isAdmin && (
                                 <Link to="/cd-validation" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Validation</Link>
@@ -156,16 +153,6 @@ function Header() {
                                             style={{ color: COLORS.magenta, fontSize: '16px' }}
                                         >
                                             Admin Dashboard
-                                        </Link>
-                                    )}
-                                    {isAdmin && (
-                                        <Link 
-                                            to="/register" 
-                                            onClick={handleLinkClick}
-                                            className="block p-3 rounded transition hover:bg-gray-200" 
-                                            style={{ color: COLORS.magenta, fontSize: '16px' }}
-                                        >
-                                            Register
                                         </Link>
                                     )}
                                     {isAdmin && (

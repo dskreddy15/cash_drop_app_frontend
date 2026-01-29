@@ -131,29 +131,29 @@ function CdDashboard() {
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '12px', color: COLORS.gray }}>
+    <div className="min-h-screen bg-gray-100 p-2 md:p-4" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '14px', color: COLORS.gray }}>
       <div className="max-w-[1400px] mx-auto bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
         
         {/* Header Section */}
-        <div className="p-6 border-b border-gray-200 bg-white">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="p-4 md:p-6 border-b border-gray-200 bg-white">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
             <h2 className="font-bold tracking-tight uppercase" style={{ fontSize: '24px' }}>Cash <span style={{ color: COLORS.magenta }}>Dashboard</span></h2>
             
-            <div className="flex flex-wrap items-end gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex flex-wrap items-end gap-2 md:gap-3 p-2 md:p-3 bg-gray-50 rounded-lg border border-gray-200 w-full md:w-auto">
               <div className="flex flex-col">
-                <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>From</label>
-                <input type="date" value={selectedDateFrom} onChange={e => setSelectedDateFrom(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-pink-500" style={{ fontSize: '12px' }} />
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>From</label>
+                <input type="date" value={selectedDateFrom} onChange={e => setSelectedDateFrom(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
               </div>
               <div className="flex flex-col">
-                <label className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.gray }}>To</label>
-                <input type="date" value={selectedDateTo} onChange={e => setSelectedDateTo(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-pink-500" style={{ fontSize: '12px' }} />
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>To</label>
+                <input type="date" value={selectedDateTo} onChange={e => setSelectedDateTo(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
               </div>
-              <button onClick={() => fetchData(selectedDateFrom, selectedDateTo)} className="text-white px-5 py-2 rounded font-bold text-xs transition-all" style={{ backgroundColor: COLORS.magenta, fontSize: '12px' }}>Fetch Data</button>
+              <button onClick={() => fetchData(selectedDateFrom, selectedDateTo)} className="text-white px-4 md:px-5 py-2 rounded font-bold transition-all" style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}>Fetch Data</button>
               
-              <div className="flex gap-1 border-l pl-3 border-gray-300">
-                <button onClick={handleWTD} className="px-3 py-2 bg-white border border-gray-300 rounded text-[10px] font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '12px' }}>WTD</button>
-                <button onClick={handleMTD} className="px-3 py-2 bg-white border border-gray-300 rounded text-[10px] font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '12px' }}>MTD</button>
-                <button onClick={handleYTD} className="px-3 py-2 bg-white border border-gray-300 rounded text-[10px] font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '12px' }}>YTD</button>
+              <div className="flex gap-1 border-l pl-2 md:pl-3 border-gray-300">
+                <button onClick={handleWTD} className="px-2 md:px-3 py-2 bg-white border border-gray-300 rounded font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '14px' }}>WTD</button>
+                <button onClick={handleMTD} className="px-2 md:px-3 py-2 bg-white border border-gray-300 rounded font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '14px' }}>MTD</button>
+                <button onClick={handleYTD} className="px-2 md:px-3 py-2 bg-white border border-gray-300 rounded font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '14px' }}>YTD</button>
               </div>
             </div>
           </div>
@@ -162,21 +162,21 @@ function CdDashboard() {
         <div className="flex flex-col md:flex-row min-h-[700px]">
           
           {/* Left Sidebar: Dates */}
-          <div className="w-full md:w-56 bg-gray-50 border-r border-gray-200 p-4">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color: COLORS.gray }}>Date Log</h4>
+          <div className="w-full md:w-56 bg-gray-50 border-r border-gray-200 p-3 md:p-4">
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: COLORS.gray, fontSize: '14px' }}>Date Log</h4>
             <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
               {uniqueDates.map(date => (
                 <button
                   key={date}
                   onClick={() => setActiveDate(date)}
-                  className={`w-full text-left px-4 py-3 rounded text-xs font-bold transition-all ${
+                  className={`w-full text-left px-3 md:px-4 py-2 md:py-3 rounded font-bold transition-all ${
                     activeDate === date 
                     ? 'text-white shadow-md' 
                     : 'bg-white text-gray-600 hover:border-pink-500 border border-gray-200'
                   }`}
                   style={{ 
                     backgroundColor: activeDate === date ? COLORS.magenta : undefined,
-                    fontSize: '12px'
+                    fontSize: '14px'
                   }}
                 >
                   {new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -186,55 +186,69 @@ function CdDashboard() {
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1 p-6 bg-white">
+          <div className="flex-1 p-3 md:p-6 bg-white overflow-x-auto">
             {!activeDate ? (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400 italic text-sm">
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 italic" style={{ fontSize: '14px' }}>
                 Select a date from the log to view details
               </div>
             ) : (
               <div className="max-w-6xl mx-auto">
                 {/* Column Headers */}
-                <div className="grid grid-cols-2 gap-8 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-6">
                   <div className="flex items-center gap-2 border-b-2 pb-2" style={{ borderColor: COLORS.magenta }}>
-                    <span className="text-sm font-black uppercase tracking-widest" style={{ fontSize: '18px' }}>Cash Drops</span>
+                    <span className="font-black uppercase tracking-widest" style={{ fontSize: '18px' }}>Cash Drops</span>
                   </div>
                   <div className="flex items-center gap-2 border-b-2 pb-2" style={{ borderColor: COLORS.yellowGreen }}>
-                    <span className="text-sm font-black uppercase tracking-widest" style={{ fontSize: '18px' }}>Cash Drawers</span>
+                    <span className="font-black uppercase tracking-widest" style={{ fontSize: '18px' }}>Cash Drawers</span>
                   </div>
                 </div>
 
                 {/* Data Rows: This logic ensures horizontal alignment */}
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   {[...Array(maxRows)].map((_, index) => {
                     const drop = cashDrops.filter(d => d.date === activeDate)[index];
                     const drawer = cashDrawers.filter(d => d.date === activeDate)[index];
 
                     return (
-                      <div key={index} className="grid grid-cols-2 gap-8 items-stretch">
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-stretch">
                         
                         {/* Drop Card */}
                         <div className="h-full">
                           {drop ? (
-                            <div className="h-full flex flex-col p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
-                              <div className="flex justify-between items-start mb-4">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.lightPink + '20', color: COLORS.magenta }}>Shift {drop.shift_number}</span>
-                                <span className="text-2xl font-bold tracking-tighter" style={{ color: COLORS.magenta }}>${drop.drop_amount}</span>
+                            <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
+                              <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
+                                <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.lightPink + '20', color: COLORS.magenta, fontSize: '14px' }}>Shift {drop.shift_number}</span>
+                                <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.magenta }}>${drop.drop_amount}</span>
                               </div>
-                              <div className="text-[10px] font-bold uppercase mb-2" style={{ color: COLORS.gray }}>
+                              <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                 Register: {drop.workstation} | {drop.user_name}
                               </div>
                               {drop.submitted_at && (
-                                <div className="text-[9px] mb-4 italic" style={{ color: COLORS.gray }}>
+                                <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                   Submitted: {formatDateTime(drop.date, drop.submitted_at)}
+                                </div>
+                              )}
+                              {drop.variance !== undefined && drop.variance !== null && (
+                                <div className="mb-3 md:mb-4">
+                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Variance:</span>
+                                  <span className={`font-bold ${parseFloat(drop.variance) !== 0 ? 'text-red-500' : 'text-gray-400'}`} style={{ fontSize: '14px' }}>
+                                    ${parseFloat(drop.variance).toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                              {drop.notes && (
+                                <div className="mb-3 md:mb-4 p-2 bg-white rounded border border-gray-200">
+                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Notes:</span>
+                                  <span className="text-xs italic" style={{ color: COLORS.gray, fontSize: '14px' }}>{drop.notes}</span>
                                 </div>
                               )}
                               <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
                                 {DENOMINATION_CONFIG.map(denom => {
                                   const value = drop[denom.name] || 0;
                                   return (
-                                    <div key={denom.name} className="flex justify-between text-[10px] bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray }}>{denom.display}</span>
-                                      <span className="font-bold">{value}</span>
+                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
+                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
                                     </div>
                                   );
                                 })}
@@ -246,21 +260,21 @@ function CdDashboard() {
                         {/* Drawer Card */}
                         <div className="h-full">
                           {drawer ? (
-                            <div className="h-full flex flex-col p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
-                              <div className="flex justify-between items-start mb-4">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen }}>Register {drawer.workstation}</span>
-                                <span className="text-2xl font-bold tracking-tighter" style={{ color: COLORS.yellowGreen }}>${drawer.total_cash}</span>
+                            <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
+                              <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
+                                <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '14px' }}>Register {drawer.workstation}</span>
+                                <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.yellowGreen }}>${drawer.total_cash}</span>
                               </div>
-                              <div className="text-[10px] font-bold uppercase mb-4" style={{ color: COLORS.gray }}>
+                              <div className="text-xs font-bold uppercase mb-3 md:mb-4" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                 Initial: ${drawer.starting_cash} | {drawer.user_name}
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
                                 {DENOMINATION_CONFIG.map(denom => {
                                   const value = drawer[denom.name] || 0;
                                   return (
-                                    <div key={denom.name} className="flex justify-between text-[10px] bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray }}>{denom.display}</span>
-                                      <span className="font-bold">{value}</span>
+                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
+                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
                                     </div>
                                   );
                                 })}

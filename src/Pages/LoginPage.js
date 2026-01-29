@@ -64,7 +64,7 @@ function LoginPage() {
                                     type="email"
                                     id="email"
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
-                                    style={{ fontSize: '12px' }}
+                                    style={{ fontSize: '14px' }}
                                     placeholder="test@example.com"
                                     required
                                     value={email}
@@ -79,7 +79,7 @@ function LoginPage() {
                                     value={totp}
                                     onChange={(e) => setTotp(e.target.value)}
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
-                                    style={{ fontSize: '12px' }}
+                                    style={{ fontSize: '14px' }}
                                     required
                                 />
                             </div>

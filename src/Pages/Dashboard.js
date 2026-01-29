@@ -44,7 +44,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                             value={formData.name}
                             onChange={handleChange}
                             className="shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:ring-2 focus:ring-pink-500"
-                            style={{ fontSize: '12px' }}
+                            style={{ fontSize: '14px' }}
                             required
                         />
                     </div>
@@ -57,7 +57,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                             value={formData.email}
                             readOnly
                             className="shadow appearance-none border rounded w-full py-2 px-3 leading-tight bg-gray-200"
-                            style={{ fontSize: '12px' }}
+                            style={{ fontSize: '14px' }}
                         />
                     </div>
                     <div className="mb-6 flex items-center">
@@ -101,6 +101,7 @@ const Dashboard = () => {
     const [isAdmin, setIsAdmin] = useState(sessionStorage.getItem('is_admin') === 'true');
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
+    const [deleteModal, setDeleteModal] = useState({ show: false, userId: null, userName: '' });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
@@ -264,10 +265,17 @@ const Dashboard = () => {
         }
     };
 
-    const handleDelete = async (userId) => {
-        if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-            return;
-        }
+    const handleDeleteClick = (userId) => {
+        const user = users.find(u => u.id === userId);
+        setDeleteModal({ show: true, userId, userName: user ? user.name : '' });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteModal.userId) return;
+        
+        const userId = deleteModal.userId;
+        setDeleteModal({ show: false, userId: null, userName: '' });
+        
         let accessToken = sessionStorage.getItem('access_token');
         if (!accessToken) {
             showStatusMessage("No access token found. Please log in again.", 'error');
@@ -329,7 +337,7 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4 md:p-8" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '12px', color: COLORS.gray }}>
+        <div className="min-h-screen bg-gray-100 p-2 md:p-4" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '14px', color: COLORS.gray }}>
             {/* Status Message */}
             {statusMessage.show && (
                 <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
@@ -337,65 +345,76 @@ const Dashboard = () => {
                     statusMessage.type === 'success' ? 'bg-green-100 border-l-4 border-green-500' : 
                     'bg-blue-100 border-l-4 border-blue-500'
                 }`}>
-                    <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`} style={{ fontSize: '12px' }}>
+                    <p className={`font-bold ${statusMessage.type === 'error' ? 'text-red-700' : statusMessage.type === 'success' ? 'text-green-700' : 'text-blue-700'}`} style={{ fontSize: '14px' }}>
                         {statusMessage.text}
                     </p>
                 </div>
             )}
 
             <div className="max-w-[1400px] mx-auto bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b bg-white">
-                    <h2 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '24px' }}>Admin <span style={{ color: COLORS.magenta }}>Dashboard</span></h2>
-                    <p className="text-[10px] font-bold tracking-widest uppercase mt-1" style={{ color: COLORS.gray, fontSize: '12px' }}>User Management</p>
+                <div className="p-4 md:p-6 border-b bg-white">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h2 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '24px' }}>Admin <span style={{ color: COLORS.magenta }}>Dashboard</span></h2>
+                            <p className="text-xs font-bold tracking-widest uppercase mt-1" style={{ color: COLORS.gray, fontSize: '14px' }}>User Management</p>
+                        </div>
+                        <Link
+                            to="/register"
+                            className="text-white font-black px-4 py-2 rounded-lg shadow-md transition-all active:scale-95 uppercase tracking-widest whitespace-nowrap"
+                            style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+                        >
+                            New User
+                        </Link>
+                    </div>
                 </div>
 
                 {error && (
                     <div className="p-4 bg-red-50 border-l-4 border-red-500">
-                        <p className="font-bold text-red-700" style={{ fontSize: '12px' }}>{error}</p>
+                        <p className="font-bold text-red-700" style={{ fontSize: '14px' }}>{error}</p>
                     </div>
                 )}
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
-                            <tr className="bg-gray-50 text-[10px] font-black uppercase border-b" style={{ color: COLORS.gray }}>
-                                <th className="p-4" style={{ fontSize: '12px' }}>ID</th>
-                                <th className="p-4" style={{ fontSize: '12px' }}>Name</th>
-                                <th className="p-4" style={{ fontSize: '12px' }}>Email</th>
-                                <th className="p-4" style={{ fontSize: '12px' }}>Admin</th>
-                                <th className="p-4" style={{ fontSize: '12px' }}>Actions</th>
+                            <tr className="bg-gray-50 font-black uppercase border-b" style={{ color: COLORS.gray }}>
+                                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>ID</th>
+                                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Name</th>
+                                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Email</th>
+                                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Admin</th>
+                                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {users.length > 0 ? users.map(user => (
                                 <tr key={user.id} className="border-b hover:bg-pink-50/30 transition-colors">
-                                    <td className="p-4 font-bold" style={{ fontSize: '12px' }}>{user.id}</td>
-                                    <td className="p-4 font-bold" style={{ fontSize: '12px' }}>{user.name}</td>
-                                    <td className="p-4" style={{ fontSize: '12px' }}>{user.email}</td>
-                                    <td className="p-4">
+                                    <td className="p-2 md:p-4 font-bold" style={{ fontSize: '14px' }}>{user.id}</td>
+                                    <td className="p-2 md:p-4 font-bold" style={{ fontSize: '14px' }}>{user.name}</td>
+                                    <td className="p-2 md:p-4" style={{ fontSize: '14px' }}>{user.email}</td>
+                                    <td className="p-2 md:p-4">
                                         {user.is_admin ? (
-                                            <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '12px' }}>
+                                            <span className="px-2 py-1 rounded font-bold uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '14px' }}>
                                                 Yes
                                             </span>
                                         ) : (
-                                            <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: COLORS.gray + '20', color: COLORS.gray, fontSize: '12px' }}>
+                                            <span className="px-2 py-1 rounded font-bold uppercase" style={{ backgroundColor: COLORS.gray + '20', color: COLORS.gray, fontSize: '14px' }}>
                                                 No
                                             </span>
                                         )}
                                     </td>
-                                    <td className="p-4">
-                                        <div className="flex gap-2">
+                                    <td className="p-2 md:p-4">
+                                        <div className="flex flex-col md:flex-row gap-2">
                                             <button
                                                 onClick={() => handleEdit(user)}
                                                 className="px-3 py-1 rounded font-bold transition"
-                                                style={{ backgroundColor: COLORS.lightPink, color: 'white', fontSize: '12px' }}
+                                                style={{ backgroundColor: COLORS.lightPink, color: 'white', fontSize: '14px' }}
                                             >
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(user.id)}
+                                                onClick={() => handleDeleteClick(user.id)}
                                                 className="px-3 py-1 rounded font-bold transition"
-                                                style={{ backgroundColor: COLORS.gray, color: 'white', fontSize: '12px' }}
+                                                style={{ backgroundColor: COLORS.gray, color: 'white', fontSize: '14px' }}
                                             >
                                                 Delete
                                             </button>
@@ -404,7 +423,7 @@ const Dashboard = () => {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="5" className="p-20 text-center italic font-bold uppercase tracking-widest" style={{ color: COLORS.gray, fontSize: '12px' }}>
+                                    <td colSpan="5" className="p-20 text-center italic font-bold uppercase tracking-widest" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                         No users found
                                     </td>
                                 </tr>
@@ -423,6 +442,58 @@ const Dashboard = () => {
                     }}
                     onSave={handleUpdateUser}
                 />
+            )}
+
+            {/* DELETE CONFIRMATION MODAL */}
+            {deleteModal.show && deleteModal.userId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="relative max-w-md w-full bg-white rounded-lg shadow-2xl overflow-hidden">
+                        {/* Header */}
+                        <div className="p-4" style={{ backgroundColor: COLORS.lightPink }}>
+                            <h3 className="text-white font-black uppercase tracking-widest text-center" style={{ fontSize: '18px' }}>
+                                Confirm Delete
+                            </h3>
+                        </div>
+                        
+                        {/* Body */}
+                        <div className="p-6">
+                            <p className="mb-4 text-center" style={{ fontSize: '14px', color: COLORS.gray }}>
+                                Are you sure you want to delete this user?
+                            </p>
+                            <p className="mb-6 text-center italic font-bold" style={{ fontSize: '14px', color: COLORS.lightPink }}>
+                                This action cannot be undone.
+                            </p>
+                            
+                            {/* User Details */}
+                            {deleteModal.userName && (
+                                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold uppercase" style={{ fontSize: '14px', color: COLORS.gray }}>User:</span>
+                                        <span className="font-black" style={{ fontSize: '14px', color: COLORS.magenta }}>{deleteModal.userName}</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Buttons */}
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <button
+                                    onClick={handleDeleteConfirm}
+                                    className="flex-1 text-white font-black px-4 py-3 rounded-lg shadow-md transition-all active:scale-95 uppercase tracking-widest"
+                                    style={{ backgroundColor: COLORS.lightPink, fontSize: '14px' }}
+                                >
+                                    Delete
+                                </button>
+                                <button
+                                    onClick={() => setDeleteModal({ show: false, userId: null, userName: '' })}
+                                    className="flex-1 text-white font-black px-4 py-3 rounded-lg shadow-md transition-all active:scale-95 uppercase tracking-widest"
+                                    style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
