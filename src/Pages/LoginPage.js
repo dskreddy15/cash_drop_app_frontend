@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from "../config/api";
 // Color constants
 const COLORS = {
   magenta: '#AA056C',
-  yellowGreen: '#C4CB07',
+  yellowGreen: '#48BB78',
   lightPink: '#F46690',
   gray: '#64748B'
 };
@@ -27,13 +27,12 @@ function LoginPage() {
             const response = await fetch(API_ENDPOINTS.LOGIN, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: 'include', // Important: include cookies
                 body: JSON.stringify({ email, totp_code: totp }),
             });
             const data = await response.json();
             if (response.ok) {
-                sessionStorage.setItem('access_token', data.access);
-                sessionStorage.setItem('refresh_token', data.refresh);
-                sessionStorage.setItem('is_admin', String(data.is_admin));
+                // Tokens are now stored in HttpOnly cookies, no need to store in sessionStorage
                 setMessage("Login successful!");
                 console.log('Login successful, is_admin:', data.is_admin);
                 navigate(data.is_admin ? '/dashboard' : '/cd-dashboard');

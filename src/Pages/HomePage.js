@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 // Color constants
 const COLORS = {
   magenta: '#AA056C',
-  yellowGreen: '#C4CB07',
+  yellowGreen: '#48BB78',
   lightPink: '#F46690',
   gray: '#64748B'
 };

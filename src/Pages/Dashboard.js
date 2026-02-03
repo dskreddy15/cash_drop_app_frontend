@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { API_ENDPOINTS } from "../config/api";
+import { authenticatedFetch, checkAuth } from "../utils/auth";
 
 // Color constants
 const COLORS = {
   magenta: '#AA056C',
-  yellowGreen: '#C4CB07',
+  yellowGreen: '#48BB78',
   lightPink: '#F46690',
   gray: '#64748B'
 };
@@ -102,12 +103,13 @@ const Dashboard = () => {
     }, []);
 
     const [users, setUsers] = useState([]);
-    const [isLoggedIn, setIsLoggedIn] = useState(!!sessionStorage.getItem('access_token'));
-    const [isAdmin, setIsAdmin] = useState(sessionStorage.getItem('is_admin') === 'true');
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [deleteModal, setDeleteModal] = useState({ show: false, userId: null, userName: '' });
     const [loading, setLoading] = useState(true);
+    const [authChecked, setAuthChecked] = useState(false); // Track if auth check is complete
     const [error, setError] = useState('');
     const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
     
@@ -132,37 +134,31 @@ const Dashboard = () => {
         setTimeout(() => setStatusMessage({ show: false, text: '', type: 'info' }), 5000);
     };
 
-    const refreshToken = async () => {
-        const refreshToken = sessionStorage.getItem('refresh_token');
-        if (!refreshToken) {
-            setError("No refresh token found. Please log in again.");
-            setIsLoggedIn(false);
-            setIsAdmin(false);
-            return null;
-        }
-        try {
-            const response = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh: refreshToken }),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                sessionStorage.setItem('access_token', data.access);
-                return data.access;
-            } else {
-                const errorData = await response.json();
-                console.error("Token refresh failed:", errorData);
-                throw new Error(errorData.detail || 'Token refresh failed');
+    // Check authentication on mount
+    useEffect(() => {
+        const checkAuthStatus = async () => {
+            try {
+                const authStatus = await checkAuth();
+                setIsLoggedIn(authStatus.authenticated);
+                if (authStatus.authenticated && authStatus.user) {
+                    setIsAdmin(authStatus.user.is_admin || false);
+                    sessionStorage.setItem('is_admin', String(authStatus.user.is_admin || false)); // Keep for other frontend logic
+                } else {
+                    setIsAdmin(false);
+                    sessionStorage.removeItem('is_admin');
+                }
+            } catch (error) {
+                console.error('Error checking auth:', error);
+                setIsLoggedIn(false);
+                setIsAdmin(false);
+                sessionStorage.removeItem('is_admin');
+            } finally {
+                setAuthChecked(true);
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Token refresh error:", error);
-            sessionStorage.clear();
-            setIsLoggedIn(false);
-            setIsAdmin(false);
-            return null;
-        }
-    };
+        };
+        checkAuthStatus();
+    }, []);
 
     const fetchUsers = async () => {
         if (!isLoggedIn || !isAdmin) {
@@ -170,31 +166,18 @@ const Dashboard = () => {
             setError("Not logged in or not an admin.");
             return;
         }
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-            setError("No access token found. Please log in again.");
-            setLoading(false);
-            setIsLoggedIn(false);
-            setIsAdmin(false);
-            return;
-        }
         try {
-            let response = await fetch(API_ENDPOINTS.USERS, {
+            let response = await authenticatedFetch(API_ENDPOINTS.USERS, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
             });
             if (response.status === 401) {
-                accessToken = await refreshToken();
-                if (accessToken) {
-                    response = await fetch(API_ENDPOINTS.USERS, {
+                // Try to refresh token
+                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                    method: 'POST',
+                });
+                if (refreshResponse.ok) {
+                    response = await authenticatedFetch(API_ENDPOINTS.USERS, {
                         method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`,
-                        },
                     });
                 } else {
                     setError("Authentication failed. Please log in again.");
@@ -212,7 +195,6 @@ const Dashboard = () => {
                 setError(`Failed to fetch users: ${errorData.detail || response.statusText}`);
                 if (response.status === 403) {
                     setError("You are not authorized to view this page.");
-                    sessionStorage.clear();
                     setIsLoggedIn(false);
                     setIsAdmin(false);
                 }
@@ -225,19 +207,18 @@ const Dashboard = () => {
     };
 
     const fetchAdminSettings = async () => {
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-            return;
-        }
         try {
-            let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
-                headers: { 'Authorization': `Bearer ${accessToken}` },
+            let response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+                method: 'GET',
             });
             if (response.status === 401) {
-                accessToken = await refreshToken();
-                if (accessToken) {
-                    response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
-                        headers: { 'Authorization': `Bearer ${accessToken}` },
+                // Try to refresh token
+                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                    method: 'POST',
+                });
+                if (refreshResponse.ok) {
+                    response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+                        method: 'GET',
                     });
                 } else {
                     return;
@@ -254,29 +235,19 @@ const Dashboard = () => {
     };
 
     const updateAdminSettings = async () => {
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-            showStatusMessage("No access token found. Please log in again.", 'error');
-            return;
-        }
         try {
-            let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+            let response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
                 body: JSON.stringify(settings),
             });
             if (response.status === 401) {
-                accessToken = await refreshToken();
-                if (accessToken) {
-                    response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+                // Try to refresh token
+                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                    method: 'POST',
+                });
+                if (refreshResponse.ok) {
+                    response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`,
-                        },
                         body: JSON.stringify(settings),
                     });
                 } else {
@@ -332,9 +303,12 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
-        fetchUsers();
-        fetchAdminSettings();
-    }, [isLoggedIn, isAdmin]);
+        // Only fetch data after auth check is complete and user is authenticated and admin
+        if (authChecked && isLoggedIn && isAdmin) {
+            fetchUsers();
+            fetchAdminSettings();
+        }
+    }, [authChecked, isLoggedIn, isAdmin]);
 
     const handleEdit = (user) => {
         setCurrentUserToEdit(user);
@@ -342,35 +316,22 @@ const Dashboard = () => {
     };
 
     const handleUpdateUser = async (userId, formData) => {
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-            showStatusMessage("No access token found. Please log in again.", 'error');
-            sessionStorage.clear();
-            setIsLoggedIn(false);
-            setIsAdmin(false);
-            return;
-        }
         // Exclude email from the payload since it's read-only
         const { name, is_admin } = formData;
         const payload = { name, is_admin };
         try {
-            let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
+            let response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
                 body: JSON.stringify(payload),
             });
             if (response.status === 401) {
-                accessToken = await refreshToken();
-                if (accessToken) {
-                    response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
+                // Try to refresh token
+                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                    method: 'POST',
+                });
+                if (refreshResponse.ok) {
+                    response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`,
-                        },
                         body: JSON.stringify(payload),
                     });
                 } else {
@@ -405,31 +366,18 @@ const Dashboard = () => {
         const userId = deleteModal.userId;
         setDeleteModal({ show: false, userId: null, userName: '' });
         
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-            showStatusMessage("No access token found. Please log in again.", 'error');
-            sessionStorage.clear();
-            setIsLoggedIn(false);
-            setIsAdmin(false);
-            return;
-        }
         try {
-            let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
+            let response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
             });
             if (response.status === 401) {
-                accessToken = await refreshToken();
-                if (accessToken) {
-                    response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
+                // Try to refresh token
+                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                    method: 'POST',
+                });
+                if (refreshResponse.ok) {
+                    response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`,
-                        },
                     });
                 } else {
                     showStatusMessage("Authentication failed. Please log in again.", 'error');
@@ -450,7 +398,8 @@ const Dashboard = () => {
         }
     };
 
-    if (loading) {
+    // Show loading while checking authentication
+    if (!authChecked || loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
                 <div className="text-center">
@@ -461,7 +410,8 @@ const Dashboard = () => {
         );
     }
 
-    if (!isLoggedIn || !isAdmin) {
+    // Only redirect after auth check is complete
+    if (authChecked && (!isLoggedIn || !isAdmin)) {
         return <Navigate to="/login" />;
     }
 

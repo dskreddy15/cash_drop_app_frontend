@@ -29,6 +29,10 @@ export const API_ENDPOINTS = {
   // Ignore Cash Drop
   IGNORE_CASH_DROP: `${API_BASE_URL}/api/cash-drop-app1/cash-drop/ignore`,
   
+  // Delete endpoints
+  DELETE_CASH_DROP: (id) => `${API_BASE_URL}/api/cash-drop-app1/cash-drop/${id}`,
+  DELETE_CASH_DRAWER: (id) => `${API_BASE_URL}/api/cash-drop-app1/cash-drawer/${id}`,
+  
   // Media
   MEDIA: `${API_BASE_URL}/media`,
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, formatPSTDate } from '../utils/dateUtils';
+import { authenticatedFetch } from '../utils/auth';
 
 function CashDropValidation() {
   const [data, setData] = useState([]);
@@ -45,7 +46,7 @@ function CashDropValidation() {
 
   const COLORS = {
     magenta: '#AA056C',
-    yellowGreen: '#C4CB07',
+    yellowGreen: '#48BB78',
     lightPink: '#F46690',
     gray: '#64748B'
   };
@@ -65,11 +66,9 @@ function CashDropValidation() {
 
   const fetchData = async () => {
     setLoading(true);
-    const token = sessionStorage.getItem('access_token');
     try {
-      const response = await fetch(
-        `${API_ENDPOINTS.CASH_DROP_RECONCILER}?datefrom=${dateFrom}&dateto=${dateTo}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+      const response = await authenticatedFetch(
+        `${API_ENDPOINTS.CASH_DROP_RECONCILER}?datefrom=${dateFrom}&dateto=${dateTo}`
       );
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
@@ -140,12 +139,8 @@ function CashDropValidation() {
       requestBody.notes = reconciliationNotes[item.id];
     }
 
-    const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
+    const response = await authenticatedFetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
-      },
       body: JSON.stringify(requestBody)
     });
 
@@ -179,12 +174,8 @@ function CashDropValidation() {
     const item = unreconcileModal.item;
     setUnreconcileModal({ show: false, item: null });
 
-    const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
+    const response = await authenticatedFetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
-      },
       body: JSON.stringify({ 
         id: item.id, 
         is_reconciled: false

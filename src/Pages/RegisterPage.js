@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from "../config/api";
 // Color constants
 const COLORS = {
   magenta: '#AA056C',
-  yellowGreen: '#C4CB07',
+  yellowGreen: '#48BB78',
   lightPink: '#F46690',
   gray: '#64748B'
 };
@@ -24,8 +24,8 @@ function RegisterPage() {
     const [message, setMessage] = useState("");
     const [userCount, setUserCount] = useState(null);
     const [checkingUsers, setCheckingUsers] = useState(true);
-    const isLoggedIn = !!sessionStorage.getItem('access_token');
-    const isAdminUser = sessionStorage.getItem('is_admin') === 'true';
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isAdminUser, setIsAdminUser] = useState(false);
 
     useEffect(() => {
         const checkUserCount = async () => {
@@ -53,22 +53,17 @@ function RegisterPage() {
         e.preventDefault();
         try {
             // If zero users, allow registration without auth token
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            
-            // Only add auth token if user is logged in
-            const token = sessionStorage.getItem('access_token');
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
+            // Auth is handled by cookies if user is logged in
             
             // If zero users, force isAdmin to true for first user
             const adminValue = userCount === 0 ? true : isAdmin;
             
             const response = await fetch(API_ENDPOINTS.USERS, {
                 method: "POST",
-                headers: headers,
+                credentials: 'include', // Include cookies if logged in
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({ name, email, isAdmin: adminValue }),
             });
             const data = await response.json();

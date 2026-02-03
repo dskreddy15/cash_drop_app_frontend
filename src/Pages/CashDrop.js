@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate } from '../utils/dateUtils';
+import { authenticatedFetch } from '../utils/auth';
 
 function CashDrop() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ function CashDrop() {
   // Color constants
   const COLORS = {
     magenta: '#AA056C',
-    yellowGreen: '#C4CB07',
+    yellowGreen: '#48BB78',
     lightPink: '#F46690',
     gray: '#64748B'
   };
@@ -60,9 +61,7 @@ function CashDrop() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.CURRENT_USER, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('access_token')}` },
-        });
+        const response = await authenticatedFetch(API_ENDPOINTS.CURRENT_USER);
         if (!response.ok) throw new Error('Auth failed');
         const data = await response.json();
         setFormData(prev => ({ ...prev, employeeName: data.name }));
@@ -86,6 +85,75 @@ function CashDrop() {
       }
     };
     fetchSettings();
+
+    // Load draft from backend or sessionStorage
+    const loadDraft = async () => {
+      try {
+        // First check backend for drafts
+        const today = getPSTDate();
+        const draftResponse = await authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${today}&dateto=${today}`);
+        
+        if (draftResponse.ok) {
+          const drops = await draftResponse.json();
+          const draft = drops.find(d => d.status === 'drafted');
+          
+          if (draft) {
+            setDraftId(draft.id);
+            if (draft.drawer_entry_id) {
+              setDraftDrawerId(draft.drawer_entry_id);
+            }
+            
+            // Restore form data from draft
+            setFormData(prev => ({
+              ...prev,
+              shiftNumber: draft.shift_number || '',
+              workStation: draft.workstation || '',
+              date: draft.date || getPSTDate(),
+              cashReceivedOnReceipt: draft.ws_label_amount || 0,
+              notes: draft.notes || '',
+              hundreds: draft.hundreds || 0,
+              fifties: draft.fifties || 0,
+              twenties: draft.twenties || 0,
+              tens: draft.tens || 0,
+              fives: draft.fives || 0,
+              twos: draft.twos || 0,
+              ones: draft.ones || 0,
+              halfDollars: draft.half_dollars || 0,
+              quarters: draft.quarters || 0,
+              dimes: draft.dimes || 0,
+              nickels: draft.nickels || 0,
+              pennies: draft.pennies || 0
+            }));
+            
+            setTimeout(() => {
+              showStatusMessage('Retrieved previous draft details.', 'info');
+            }, 500);
+            return;
+          }
+        }
+        
+        // Fallback to sessionStorage
+        const draftData = sessionStorage.getItem('cashDropDraft');
+        if (draftData) {
+          const draft = JSON.parse(draftData);
+          // Only restore if we have essential fields
+          if (draft.workStation || draft.shiftNumber || draft.cashReceivedOnReceipt) {
+            setFormData(prev => ({ ...draft }));
+            if (draft.labelImage) {
+              // Note: We can't restore the actual file, but we can store the filename
+              setLabelImage(draft.labelImage);
+            }
+            // Use setTimeout to ensure showStatusMessage is available
+            setTimeout(() => {
+              showStatusMessage('Retrieved previous draft details.', 'info');
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    };
+    loadDraft();
   }, [navigate]);
 
   useEffect(() => {
@@ -96,6 +164,128 @@ function CashDrop() {
   const showStatusMessage = (text, type = 'info') => {
     setStatusMessage({ show: true, text, type });
     setTimeout(() => setStatusMessage({ show: false, text: '', type: 'info' }), 5000);
+  };
+
+  const [draftId, setDraftId] = useState(null);
+  const [draftDrawerId, setDraftDrawerId] = useState(null);
+
+  // Save draft to backend
+  const saveDraft = async () => {
+    setIsSubmitting(true);
+    try {
+      // 1. Save Drawer as draft
+      const drawerData = {
+        workstation: formData.workStation,
+        shift_number: formData.shiftNumber,
+        date: formData.date,
+        starting_cash: parseFloat(formData.startingCash),
+        total_cash: parseFloat(calculateTotalCash()),
+        status: 'drafted',
+        ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
+      };
+
+      const dRes = await authenticatedFetch(API_ENDPOINTS.CASH_DRAWER, {
+        method: 'POST',
+        body: JSON.stringify(drawerData),
+      });
+
+      if (!dRes.ok) throw new Error('Failed to save Drawer draft.');
+      const dResult = await dRes.json();
+      setDraftDrawerId(dResult.id);
+
+      // 2. Save Drop as draft
+      const dropForm = new FormData();
+      dropForm.append('drawer_entry', dResult.id);
+      dropForm.append('workstation', formData.workStation);
+      dropForm.append('shift_number', formData.shiftNumber);
+      dropForm.append('date', formData.date);
+      dropForm.append('drop_amount', calculateDropAmount());
+      dropForm.append('ws_label_amount', formData.cashReceivedOnReceipt);
+      dropForm.append('cashReceivedOnReceipt', formData.cashReceivedOnReceipt);
+      dropForm.append('variance', calculateVariance());
+      dropForm.append('status', 'drafted');
+      if (formData.notes) dropForm.append('notes', formData.notes);
+      if (labelImage) dropForm.append('label_image', labelImage);
+
+      Object.keys(cashDropDenominations || {}).forEach(key => {
+        const backendKey = key === 'halfDollars' ? 'half_dollars' : key;
+        dropForm.append(backendKey, cashDropDenominations[key] || 0);
+      });
+
+      const dropRes = await authenticatedFetch(API_ENDPOINTS.CASH_DROP, {
+        method: 'POST',
+        body: dropForm,
+      });
+
+      if (!dropRes.ok) throw new Error('Failed to save Cash Drop draft.');
+      const dropResult = await dropRes.json();
+      setDraftId(dropResult.id);
+      
+      // Also save to sessionStorage for quick restore
+      const draftData = {
+        ...formData,
+        labelImage: labelImage ? labelImage.name : null
+      };
+      sessionStorage.setItem('cashDropDraft', JSON.stringify(draftData));
+      
+      showStatusMessage('Draft saved successfully.', 'success');
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      showStatusMessage(error.message || 'Failed to save draft.', 'error');
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete draft from backend
+  const deleteDraft = async () => {
+    try {
+      const promises = [];
+      
+      if (draftId) {
+        promises.push(
+          authenticatedFetch(API_ENDPOINTS.DELETE_CASH_DROP(draftId), {
+            method: 'DELETE',
+          })
+        );
+      }
+      
+      if (draftDrawerId) {
+        promises.push(
+          authenticatedFetch(API_ENDPOINTS.DELETE_CASH_DRAWER(draftDrawerId), {
+            method: 'DELETE',
+          })
+        );
+      }
+      
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+      
+      // Clear sessionStorage
+      sessionStorage.removeItem('cashDropDraft');
+      setDraftId(null);
+      setDraftDrawerId(null);
+      
+      // Reset form
+      setFormData({
+        employeeName: formData.employeeName,
+        shiftNumber: '',
+        workStation: '',
+        date: getPSTDate(),
+        startingCash: adminSettings.starting_amount.toString(),
+        cashReceivedOnReceipt: 0,
+        pennies: 0, nickels: 0, dimes: 0, quarters: 0, halfDollars: 0,
+        ones: 0, twos: 0, fives: 0, tens: 0, twenties: 0, fifties: 0, hundreds: 0,
+        notes: ''
+      });
+      setLabelImage(null);
+      
+      showStatusMessage('Draft deleted successfully.', 'success');
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      showStatusMessage('Failed to delete draft.', 'error');
+    }
   };
 
   const handleChange = (e) => {
@@ -159,21 +349,20 @@ function CashDrop() {
     return mathCheck && drop > 0 && formData.workStation;
   };
 
-  const handleSubmit = async () => {
-    const token = sessionStorage.getItem('access_token');
+  const handleSubmit = async (isDraft = false) => {
     setIsSubmitting(true);
     try {
-      // Check max cash drops per day (excluding ignored ones)
-      const todayDropsResponse = await fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${formData.date}&dateto=${formData.date}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (todayDropsResponse.ok) {
-        const todayDrops = await todayDropsResponse.json();
-        const nonIgnoredCount = todayDrops.filter(d => !d.ignored).length;
-        if (nonIgnoredCount >= adminSettings.max_cash_drops_per_day) {
-          showStatusMessage(`Maximum cash drops per day (${adminSettings.max_cash_drops_per_day}) reached. Please ignore any incorrect entries first.`, 'error');
-          setIsSubmitting(false);
-          return;
+      // Check max cash drops per day (excluding ignored ones and drafts)
+      if (!isDraft) {
+        const todayDropsResponse = await authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${formData.date}&dateto=${formData.date}`);
+        if (todayDropsResponse.ok) {
+          const todayDrops = await todayDropsResponse.json();
+          const nonIgnoredCount = todayDrops.filter(d => !d.ignored && d.status !== 'drafted').length;
+          if (nonIgnoredCount >= adminSettings.max_cash_drops_per_day) {
+            showStatusMessage(`Maximum cash drops per day (${adminSettings.max_cash_drops_per_day}) reached. Please ignore any incorrect entries first.`, 'error');
+            setIsSubmitting(false);
+            return;
+          }
         }
       }
 
@@ -187,9 +376,8 @@ function CashDrop() {
         ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
       };
 
-      const dRes = await fetch(API_ENDPOINTS.CASH_DRAWER, {
+      const dRes = await authenticatedFetch(API_ENDPOINTS.CASH_DRAWER, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(drawerData),
       });
 
@@ -206,6 +394,7 @@ function CashDrop() {
       dropForm.append('ws_label_amount', formData.cashReceivedOnReceipt);
       dropForm.append('cashReceivedOnReceipt', formData.cashReceivedOnReceipt);
       dropForm.append('variance', calculateVariance());
+      dropForm.append('status', isDraft ? 'drafted' : 'submitted');
       if (formData.notes) dropForm.append('notes', formData.notes);
       if (labelImage) dropForm.append('label_image', labelImage);
 
@@ -214,16 +403,23 @@ function CashDrop() {
         dropForm.append(backendKey, cashDropDenominations[key]);
       });
 
-      const dropRes = await fetch(API_ENDPOINTS.CASH_DROP, {
+      const dropRes = await authenticatedFetch(API_ENDPOINTS.CASH_DROP, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: dropForm,
       });
 
       if (!dropRes.ok) throw new Error('Failed to save Cash Drop & Image.');
       
-      // Success - navigate immediately
-      navigate('/cd-dashboard');
+      // Clear draft on successful submission
+      sessionStorage.removeItem('cashDropDraft');
+      
+      if (isDraft) {
+        showStatusMessage('Draft saved successfully.', 'success');
+        setIsSubmitting(false);
+      } else {
+        // Success - navigate immediately
+        navigate('/cd-dashboard');
+      }
 
     } catch (err) {
       setIsSubmitting(false);
@@ -269,7 +465,7 @@ function CashDrop() {
             {/* Left Div: Input Fields */}
             <div className="space-y-3">
               <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Shift Number</label>
+                <label className="text-xs font-bold mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Shift Number</label>
                 <select name="shiftNumber" value={formData.shiftNumber} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 focus:border-pink-600 outline-none" style={{ fontSize: '14px' }}>
                   <option value="">Select Shift</option>
                   {adminSettings.shifts.map((shift, idx) => (
@@ -278,7 +474,7 @@ function CashDrop() {
                 </select>
               </div>
               <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Register Number</label>
+                <label className="text-xs font-bold mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Register Number</label>
                 <select name="workStation" value={formData.workStation} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 focus:border-pink-600 outline-none" style={{ fontSize: '14px' }}>
                   <option value="">Select Register</option>
                   {adminSettings.workstations.map((workstation, idx) => (
@@ -287,7 +483,7 @@ function CashDrop() {
                 </select>
               </div>
               <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.magenta, fontSize: '14px' }}>Cash Received on Receipt</label>
+                <label className="text-xs font-bold mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Cash Received on Receipt</label>
                 <input type="text" name="cashReceivedOnReceipt" value={formData.cashReceivedOnReceipt} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.magenta }} />
               </div>
             </div>
@@ -376,21 +572,42 @@ function CashDrop() {
                 />
               </div>
 
-              {isSubmitValid() ? (
-                <button onClick={handleSubmit} className="w-full py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '18px' }}>
-                  Finalize Cash Drop
-                </button>
-              ) : (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
-                  <p className="font-black text-red-500 leading-relaxed" style={{ fontSize: '14px' }}>
-                    {parseFloat(calculateDropAmount()) <= 0 && "• Drop Amount must be positive"}<br/>
-                    {formData.workStation === '' && "• Register Number is required"}<br/>
-                    {formData.shiftNumber === '' && "• Shift Number is required"}<br/>
-                    {formData.startingCash === '' && "• Starting Cash is required"}<br/>
-                    {formData.cashReceivedOnReceipt === '' && "• Cash Received on Receipt is required"}<br/>
-                  </p>
+              <div className="space-y-3">
+                {isSubmitValid() ? (
+                  <button onClick={() => handleSubmit(false)} className="w-full py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '18px' }}>
+                    Finalize Cash Drop
+                  </button>
+                ) : (
+                  <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
+                    <p className="font-black text-red-500 leading-relaxed" style={{ fontSize: '14px' }}>
+                      {parseFloat(calculateDropAmount()) <= 0 && "• Drop Amount must be positive"}<br/>
+                      {formData.workStation === '' && "• Register Number is required"}<br/>
+                      {formData.shiftNumber === '' && "• Shift Number is required"}<br/>
+                      {formData.startingCash === '' && "• Starting Cash is required"}<br/>
+                      {formData.cashReceivedOnReceipt === '' && "• Cash Received on Receipt is required"}<br/>
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={saveDraft} 
+                    className="py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" 
+                    style={{ backgroundColor: COLORS.gray, fontSize: '18px' }}
+                    disabled={isSubmitting}
+                  >
+                    Save as Draft
+                  </button>
+                  {(draftId || sessionStorage.getItem('cashDropDraft')) && (
+                    <button 
+                      onClick={deleteDraft} 
+                      className="py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" 
+                      style={{ backgroundColor: '#EF4444', fontSize: '18px' }}
+                    >
+                      Delete Draft
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

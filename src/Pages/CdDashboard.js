@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, getPSTYearStart, formatPSTDateTime, formatPSTDate } from '../utils/dateUtils';
+import { authenticatedFetch } from '../utils/auth';
 
 function CdDashboard() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ function CdDashboard() {
 
   const COLORS = {
     magenta: '#AA056C',
-    yellowGreen: '#C4CB07',
+    yellowGreen: '#48BB78',
     lightPink: '#F46690',
     gray: '#64748B'
   };
@@ -44,12 +45,16 @@ function CdDashboard() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = sessionStorage.getItem('access_token');
-      if (!token) {
+      try {
+        const response = await authenticatedFetch(API_ENDPOINTS.CURRENT_USER);
+        if (!response.ok) {
+          navigate('/login');
+          return;
+        }
+        setLoading(false);
+      } catch (error) {
         navigate('/login');
-        return;
       }
-      setLoading(false);
     };
     checkAuth();
   }, [navigate]);
@@ -59,12 +64,8 @@ function CdDashboard() {
     setActiveDate(null);
     try {
       const [dropResponse, drawerResponse] = await Promise.all([
-        fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${from}&dateto=${to}`, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('access_token')}` },
-        }),
-        fetch(`${API_ENDPOINTS.CASH_DRAWER}?datefrom=${from}&dateto=${to}`, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('access_token')}` },
-        }),
+        authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${from}&dateto=${to}`),
+        authenticatedFetch(`${API_ENDPOINTS.CASH_DRAWER}?datefrom=${from}&dateto=${to}`),
       ]);
 
       if (!dropResponse.ok || !drawerResponse.ok) {
@@ -116,12 +117,6 @@ function CdDashboard() {
 
   const uniqueDates = [...new Set([...cashDrops.map(d => d.date), ...cashDrawers.map(d => d.date)])].sort().reverse();
 
-  // Helper to group records by index to ensure horizontal row alignment
-  const maxRows = Math.max(
-    cashDrops.filter(d => d.date === activeDate).length,
-    cashDrawers.filter(d => d.date === activeDate).length
-  );
-
   const formatDateTime = (dateStr, submittedAt) => {
     return formatPSTDateTime(dateStr, submittedAt);
   };
@@ -138,13 +133,8 @@ function CdDashboard() {
     }
 
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(API_ENDPOINTS.IGNORE_CASH_DROP, {
+      const response = await authenticatedFetch(API_ENDPOINTS.IGNORE_CASH_DROP, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           id: ignoreModal.item.id,
           ignore_reason: ignoreModal.reason.trim()
@@ -240,81 +230,85 @@ function CdDashboard() {
                   </div>
                 </div>
 
-                {/* Data Rows: This logic ensures horizontal alignment */}
+                {/* Data Rows: Match drops with their corresponding drawers */}
                 <div className="space-y-4 md:space-y-6">
-                  {[...Array(maxRows)].map((_, index) => {
-                    const drop = cashDrops.filter(d => d.date === activeDate)[index];
-                    const drawer = cashDrawers.filter(d => d.date === activeDate)[index];
+                  {cashDrops.filter(d => d.date === activeDate).map((drop, dropIndex) => {
+                    // Find the corresponding drawer by drawer_entry_id, or by workstation/shift/date
+                    const drawer = drop.drawer_entry_id 
+                      ? cashDrawers.find(d => d.id === drop.drawer_entry_id && d.date === activeDate)
+                      : cashDrawers.find(d => 
+                          d.workstation === drop.workstation && 
+                          d.shift_number === drop.shift_number && 
+                          d.date === activeDate
+                        );
 
                     return (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-stretch">
+                      <div key={drop.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-stretch">
                         
                         {/* Drop Card */}
                         <div className="h-full">
-                          {drop ? (
-                            <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
-                              {/* Ignored Ribbon */}
-                              {drop.ignored && (
-                                <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  IGNORED
-                                </div>
-                              )}
-                              <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
-                                <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.lightPink + '20', color: COLORS.magenta, fontSize: '14px' }}>Shift {drop.shift_number}</span>
-                                <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.magenta }}>${drop.drop_amount}</span>
+                          <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
+                            {/* Ignored Ribbon */}
+                            {drop.ignored && (
+                              <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                IGNORED
                               </div>
-                              <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>
-                                Register: {drop.workstation} | {drop.user_name}
-                              </div>
-                              {drop.submitted_at && (
-                                <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
-                                  Submitted: {formatPSTDate(drop.date, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </div>
-                              )}
-                              {drop.variance !== undefined && drop.variance !== null && (
-                                <div className="mb-3 md:mb-4">
-                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Variance:</span>
-                                  <span className={`font-bold ${parseFloat(drop.variance) !== 0 ? 'text-red-500' : 'text-gray-400'}`} style={{ fontSize: '14px' }}>
-                                    ${parseFloat(drop.variance).toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                              {drop.notes && (
-                                <div className="mb-3 md:mb-4 p-2 bg-white rounded border border-gray-200">
-                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Notes:</span>
-                                  <span className="text-xs italic" style={{ color: COLORS.gray, fontSize: '14px' }}>{drop.notes}</span>
-                                </div>
-                              )}
-                              {drop.ignore_reason && (
-                                <div className="mb-3 md:mb-4 p-2 bg-red-50 rounded border border-red-200">
-                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Ignore Reason:</span>
-                                  <span className="text-xs italic" style={{ color: COLORS.gray, fontSize: '14px' }}>{drop.ignore_reason}</span>
-                                </div>
-                              )}
-                              {!drop.ignored && (
-                                <div className="mb-3 md:mb-4">
-                                  <button
-                                    onClick={() => setIgnoreModal({ show: true, item: drop, reason: '' })}
-                                    className="w-full px-3 py-2 text-white font-bold rounded transition-all active:scale-95"
-                                    style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
-                                  >
-                                    Ignore Cash Drop
-                                  </button>
-                                </div>
-                              )}
-                              <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
-                                {DENOMINATION_CONFIG.map(denom => {
-                                  const value = drop[denom.name] || 0;
-                                  return (
-                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                            )}
+                            <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.lightPink + '20', color: COLORS.magenta, fontSize: '14px' }}>Shift {drop.shift_number}</span>
+                              <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.magenta }}>${drop.drop_amount}</span>
                             </div>
-                          ) : <div className="h-full bg-gray-50/30 rounded-lg border border-dashed border-gray-200"></div>}
+                            <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>
+                              Register: {drop.workstation} | {drop.user_name}
+                            </div>
+                            {drop.submitted_at && (
+                              <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
+                                Submitted: {formatPSTDate(drop.date, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
+                            )}
+                            {drop.variance !== undefined && drop.variance !== null && (
+                              <div className="mb-3 md:mb-4">
+                                <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Variance:</span>
+                                <span className={`font-bold ${parseFloat(drop.variance) !== 0 ? 'text-red-500' : 'text-gray-400'}`} style={{ fontSize: '14px' }}>
+                                  ${parseFloat(drop.variance).toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                            {drop.notes && (
+                              <div className="mb-3 md:mb-4 p-2 bg-white rounded border border-gray-200">
+                                <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Notes:</span>
+                                <span className="text-xs italic" style={{ color: COLORS.gray, fontSize: '14px' }}>{drop.notes}</span>
+                              </div>
+                            )}
+                            {drop.ignored && drop.ignore_reason && (
+                              <div className="mb-3 md:mb-4 p-2 bg-red-50 rounded border border-red-200">
+                                <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Ignore Reason:</span>
+                                <span className="text-xs italic text-red-700" style={{ fontSize: '14px' }}>{drop.ignore_reason}</span>
+                              </div>
+                            )}
+                            {!drop.ignored && (
+                              <div className="mb-3 md:mb-4">
+                                <button
+                                  onClick={() => setIgnoreModal({ show: true, item: drop, reason: '' })}
+                                  className="w-full px-3 py-2 text-white font-bold rounded transition-all active:scale-95"
+                                  style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                                >
+                                  Ignore Cash Drop
+                                </button>
+                              </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
+                              {DENOMINATION_CONFIG.map(denom => {
+                                const value = drop[denom.name] || 0;
+                                return (
+                                  <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                                    <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
+                                    <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Drawer Card */}
@@ -322,7 +316,7 @@ function CdDashboard() {
                           {drawer ? (
                             <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
                               {/* Ignored Ribbon - Show if corresponding cash drop is ignored */}
-                              {drop && drop.ignored && (
+                              {drop.ignored && (
                                 <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
                                   IGNORED
                                 </div>
@@ -346,7 +340,11 @@ function CdDashboard() {
                                 })}
                               </div>
                             </div>
-                          ) : <div className="h-full bg-gray-50/30 rounded-lg border border-dashed border-gray-200"></div>}
+                          ) : (
+                            <div className="h-full bg-gray-50/30 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
+                              <span className="text-gray-400 italic" style={{ fontSize: '14px' }}>No drawer data</span>
+                            </div>
+                          )}
                         </div>
 
                       </div>

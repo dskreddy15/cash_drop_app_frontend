@@ -1,21 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_ENDPOINTS } from "../config/api";
 
 // Color constants
 const COLORS = {
   magenta: '#AA056C',
-  yellowGreen: '#C4CB07',
+  yellowGreen: '#48BB78',
   lightPink: '#F46690',
   gray: '#64748B'
 };
 
 function Header() {
-    const accessToken = sessionStorage.getItem('access_token');
-    const isAdmin = sessionStorage.getItem('is_admin') === 'true';
     const navigate = useNavigate();
     const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Check authentication status on mount and periodically
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const response = await fetch(API_ENDPOINTS.CURRENT_USER, {
+                    method: 'GET',
+                    credentials: 'include', // Include cookies
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setIsAuthenticated(true);
+                    setIsAdmin(data.is_admin || false);
+                } else {
+                    setIsAuthenticated(false);
+                    setIsAdmin(false);
+                }
+            } catch (error) {
+                setIsAuthenticated(false);
+                setIsAdmin(false);
+            }
+        };
+        
+        checkAuth();
+        // Check every 30 seconds
+        const interval = setInterval(checkAuth, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const showStatusMessage = (text, type = 'info') => {
         setStatusMessage({ show: true, text, type });
@@ -23,36 +51,33 @@ function Header() {
     };
 
     const handleLogout = async () => {
-        const refreshToken = sessionStorage.getItem('refresh_token');
-        const accessToken = sessionStorage.getItem('access_token');
-        if (!refreshToken || !accessToken) {
-            showStatusMessage("No valid tokens found. Please log in again.", 'error');
-            sessionStorage.clear();
-            navigate('/login');
-            return;
-        }
         try {
             const response = await fetch(API_ENDPOINTS.LOGOUT, {
                 method: 'POST',
+                credentials: 'include', // Include cookies
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
                 },
-                body: JSON.stringify({ refresh: refreshToken }),
             });
             if (response.ok) {
-                sessionStorage.clear();
+                setIsAuthenticated(false);
+                setIsAdmin(false);
                 navigate('/login');
                 showStatusMessage("Logout Successful", 'success');
             } else {
-                sessionStorage.clear();
                 const errorData = await response.json();
                 console.error("Logout failed:", response.status, errorData);
-                showStatusMessage(`Logout Failed: ${errorData.detail || response.statusText}`, 'error');
+                // Still navigate to login even if logout fails
+                setIsAuthenticated(false);
+                setIsAdmin(false);
+                navigate('/login');
             }
         } catch (error) {
             console.error("Error during logout:", error);
-            showStatusMessage("Error during logout: " + error.message, 'error');
+            // Still navigate to login on error
+            setIsAuthenticated(false);
+            setIsAdmin(false);
+            navigate('/login');
         }
     };
 
@@ -78,7 +103,7 @@ function Header() {
             <div className="bg-gray-100 rounded-md p-2" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
                 {/* Desktop Navigation */}
                 <nav className="hidden md:block text-center font-bold mb-2" style={{ fontSize: '24px', color: COLORS.magenta }}>
-                    {accessToken ? (
+                    {isAuthenticated ? (
                         <>
                             <Link to="/cash-drop" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop</Link>
                             <Link to="/cd-dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
@@ -127,7 +152,7 @@ function Header() {
                     {/* Mobile Menu Dropdown */}
                     {mobileMenuOpen && (
                         <div className="mt-4 space-y-2 border-t pt-2" style={{ borderColor: COLORS.gray + '40' }}>
-                            {accessToken ? (
+                            {isAuthenticated ? (
                                 <>
                                     <Link 
                                         to="/cash-drop" 
