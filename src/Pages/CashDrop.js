@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate } from '../utils/dateUtils';
-import { authenticatedFetch } from '../utils/auth';
 
 function CashDrop() {
   const navigate = useNavigate();
@@ -61,7 +60,14 @@ function CashDrop() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await authenticatedFetch(API_ENDPOINTS.CURRENT_USER);
+        const token = sessionStorage.getItem('access_token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+        const response = await fetch(API_ENDPOINTS.CURRENT_USER, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (!response.ok) throw new Error('Auth failed');
         const data = await response.json();
         setFormData(prev => ({ ...prev, employeeName: data.name }));
@@ -74,7 +80,12 @@ function CashDrop() {
     // Fetch admin settings
     const fetchSettings = async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS);
+        const token = sessionStorage.getItem('access_token');
+        const response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (response.ok) {
           const data = await response.json();
           setAdminSettings(data);
@@ -91,7 +102,10 @@ function CashDrop() {
       try {
         // First check backend for drafts
         const today = getPSTDate();
-        const draftResponse = await authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${today}&dateto=${today}`);
+        const token = sessionStorage.getItem('access_token');
+        const draftResponse = await fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${today}&dateto=${today}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         
         if (draftResponse.ok) {
           const drops = await draftResponse.json();
@@ -184,8 +198,13 @@ function CashDrop() {
         ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
       };
 
-      const dRes = await authenticatedFetch(API_ENDPOINTS.CASH_DRAWER, {
+      const token = sessionStorage.getItem('access_token');
+      const dRes = await fetch(API_ENDPOINTS.CASH_DRAWER, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(drawerData),
       });
 
@@ -212,8 +231,11 @@ function CashDrop() {
         dropForm.append(backendKey, cashDropDenominations[key] || 0);
       });
 
-      const dropRes = await authenticatedFetch(API_ENDPOINTS.CASH_DROP, {
+      const dropRes = await fetch(API_ENDPOINTS.CASH_DROP, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: dropForm,
       });
 
@@ -244,16 +266,22 @@ function CashDrop() {
       
       if (draftId) {
         promises.push(
-          authenticatedFetch(API_ENDPOINTS.DELETE_CASH_DROP(draftId), {
+          fetch(API_ENDPOINTS.DELETE_CASH_DROP(draftId), {
             method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
+            }
           })
         );
       }
       
       if (draftDrawerId) {
         promises.push(
-          authenticatedFetch(API_ENDPOINTS.DELETE_CASH_DRAWER(draftDrawerId), {
+          fetch(API_ENDPOINTS.DELETE_CASH_DRAWER(draftDrawerId), {
             method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
+            }
           })
         );
       }
@@ -352,9 +380,13 @@ function CashDrop() {
   const handleSubmit = async (isDraft = false) => {
     setIsSubmitting(true);
     try {
+      const token = sessionStorage.getItem('access_token');
+      
       // Check max cash drops per day (excluding ignored ones and drafts)
       if (!isDraft) {
-        const todayDropsResponse = await authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${formData.date}&dateto=${formData.date}`);
+        const todayDropsResponse = await fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${formData.date}&dateto=${formData.date}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (todayDropsResponse.ok) {
           const todayDrops = await todayDropsResponse.json();
           const nonIgnoredCount = todayDrops.filter(d => !d.ignored && d.status !== 'drafted').length;
@@ -376,8 +408,12 @@ function CashDrop() {
         ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
       };
 
-      const dRes = await authenticatedFetch(API_ENDPOINTS.CASH_DRAWER, {
+      const dRes = await fetch(API_ENDPOINTS.CASH_DRAWER, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(drawerData),
       });
 
@@ -403,8 +439,11 @@ function CashDrop() {
         dropForm.append(backendKey, cashDropDenominations[key]);
       });
 
-      const dropRes = await authenticatedFetch(API_ENDPOINTS.CASH_DROP, {
+      const dropRes = await fetch(API_ENDPOINTS.CASH_DROP, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: dropForm,
       });
 
@@ -496,7 +535,7 @@ function CashDrop() {
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Date</label>
-                <input type="date" name="date" value={formData.date} onChange={handleChange} max={getPSTDate()} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.gray }} />
+                <input type="date" name="date" value={formData.date || getPSTDate()} onChange={handleChange} max={getPSTDate()} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.gray }} />
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Starting Cash</label>

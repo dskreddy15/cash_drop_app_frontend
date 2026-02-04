@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, getPSTYearStart, formatPSTDateTime, formatPSTDate } from '../utils/dateUtils';
-import { authenticatedFetch } from '../utils/auth';
 
 function CdDashboard() {
   const navigate = useNavigate();
@@ -44,17 +43,13 @@ function CdDashboard() {
   ];
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await authenticatedFetch(API_ENDPOINTS.CURRENT_USER);
-        if (!response.ok) {
-          navigate('/login');
-          return;
-        }
-        setLoading(false);
-      } catch (error) {
+    const checkAuth = () => {
+      const token = sessionStorage.getItem('access_token');
+      if (!token) {
         navigate('/login');
+        return;
       }
+      setLoading(false);
     };
     checkAuth();
   }, [navigate]);
@@ -63,9 +58,14 @@ function CdDashboard() {
     setError('');
     setActiveDate(null);
     try {
+      const token = sessionStorage.getItem('access_token');
       const [dropResponse, drawerResponse] = await Promise.all([
-        authenticatedFetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${from}&dateto=${to}`),
-        authenticatedFetch(`${API_ENDPOINTS.CASH_DRAWER}?datefrom=${from}&dateto=${to}`),
+        fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${from}&dateto=${to}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_ENDPOINTS.CASH_DRAWER}?datefrom=${from}&dateto=${to}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
       ]);
 
       if (!dropResponse.ok || !drawerResponse.ok) {
@@ -133,8 +133,13 @@ function CdDashboard() {
     }
 
     try {
-      const response = await authenticatedFetch(API_ENDPOINTS.IGNORE_CASH_DROP, {
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(API_ENDPOINTS.IGNORE_CASH_DROP, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           id: ignoreModal.item.id,
           ignore_reason: ignoreModal.reason.trim()

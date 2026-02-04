@@ -19,29 +19,16 @@ function Header() {
 
     // Check authentication status on mount and periodically
     useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const response = await fetch(API_ENDPOINTS.CURRENT_USER, {
-                    method: 'GET',
-                    credentials: 'include', // Include cookies
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setIsAuthenticated(true);
-                    setIsAdmin(data.is_admin || false);
-                } else {
-                    setIsAuthenticated(false);
-                    setIsAdmin(false);
-                }
-            } catch (error) {
-                setIsAuthenticated(false);
-                setIsAdmin(false);
-            }
+        const checkAuthStatus = () => {
+            const token = sessionStorage.getItem('access_token');
+            const isAdmin = sessionStorage.getItem('is_admin') === 'true';
+            setIsAuthenticated(!!token);
+            setIsAdmin(isAdmin);
         };
         
-        checkAuth();
+        checkAuthStatus();
         // Check every 30 seconds
-        const interval = setInterval(checkAuth, 30000);
+        const interval = setInterval(checkAuthStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -54,27 +41,21 @@ function Header() {
         try {
             const response = await fetch(API_ENDPOINTS.LOGOUT, {
                 method: 'POST',
-                credentials: 'include', // Include cookies
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
                 },
             });
-            if (response.ok) {
-                setIsAuthenticated(false);
-                setIsAdmin(false);
-                navigate('/login');
-                showStatusMessage("Logout Successful", 'success');
-            } else {
-                const errorData = await response.json();
-                console.error("Logout failed:", response.status, errorData);
-                // Still navigate to login even if logout fails
-                setIsAuthenticated(false);
-                setIsAdmin(false);
-                navigate('/login');
-            }
+            // Clear sessionStorage regardless of response
+            sessionStorage.clear();
+            setIsAuthenticated(false);
+            setIsAdmin(false);
+            navigate('/login');
+            showStatusMessage("Logout Successful", 'success');
         } catch (error) {
             console.error("Error during logout:", error);
-            // Still navigate to login on error
+            // Still clear and navigate on error
+            sessionStorage.clear();
             setIsAuthenticated(false);
             setIsAdmin(false);
             navigate('/login');

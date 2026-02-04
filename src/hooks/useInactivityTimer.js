@@ -1,82 +1,53 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 /**
  * Custom hook to handle inactivity logout after specified time
- * @param {number} timeoutMinutes - Minutes of inactivity before logout (default: 10)
- * @param {function} onLogout - Callback function to execute on logout
+ * @param {number} timeout - Milliseconds of inactivity before logout (default: 10 minutes)
+ * @param {function} onTimeout - Callback function to execute on timeout
  */
-export const useInactivityTimer = (timeoutMinutes = 10, onLogout) => {
-  const navigate = useNavigate();
-  const timeoutRef = useRef(null);
-  const timeoutMs = timeoutMinutes * 60 * 1000; // Convert minutes to milliseconds
+const useInactivityTimer = (timeout, onTimeout) => {
+  const timerRef = useRef(null);
+  const onTimeoutRef = useRef(onTimeout);
+
+  useEffect(() => {
+    onTimeoutRef.current = onTimeout;
+  }, [onTimeout]);
 
   const resetTimer = () => {
-    // Clear existing timer
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
     }
-
-    // Set new timer
-    timeoutRef.current = setTimeout(() => {
-      if (onLogout) {
-        onLogout();
-      } else {
-        // Default logout behavior
-        handleLogout();
-      }
-    }, timeoutMs);
+    timerRef.current = setTimeout(() => onTimeoutRef.current(), timeout);
   };
 
-  const handleLogout = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include', // Important: include cookies
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok || !response.ok) {
-        // Navigate to login regardless of response
-        navigate('/login');
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      navigate('/login');
-    }
+  const handleActivity = () => {
+    resetTimer();
   };
 
   useEffect(() => {
-    // Events that indicate user activity
-    const events = [
-      'mousedown',
-      'mousemove',
-      'keypress',
-      'scroll',
-      'touchstart',
-      'click'
-    ];
-
-    // Set initial timer
+    // Set up initial timer
     resetTimer();
 
-    // Add event listeners
-    events.forEach(event => {
-      window.addEventListener(event, resetTimer, true);
-    });
+    // Add event listeners for user activity
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+    window.addEventListener('click', handleActivity);
 
-    // Cleanup
+    // Clean up event listeners and timer on component unmount
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimer, true);
-      });
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      window.removeEventListener('click', handleActivity);
     };
-  }, [timeoutMinutes]);
+  }, [timeout]); // Re-run effect if timeout changes
 
-  return { resetTimer };
+  // Expose a way to manually reset the timer if needed
+  return resetTimer;
 };
+
+export default useInactivityTimer;

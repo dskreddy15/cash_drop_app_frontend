@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { API_ENDPOINTS } from "../config/api";
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, formatPSTDate } from '../utils/dateUtils';
-import { authenticatedFetch } from '../utils/auth';
 
 const DENOMINATION_CONFIG = [
   { name: 'Hundreds', value: 100, field: 'hundreds', display: 'Hundreds ($100)' },
@@ -53,8 +52,10 @@ const BankDrop = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await authenticatedFetch(
-        `${API_ENDPOINTS.BANK_DROP}?datefrom=${dateFrom}&dateto=${dateTo}`
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(
+        `${API_ENDPOINTS.BANK_DROP}?datefrom=${dateFrom}&dateto=${dateTo}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
@@ -110,8 +111,10 @@ const BankDrop = () => {
     // If toggling to true, open modal to edit denominations
     if (newValue) {
       try {
-        const response = await authenticatedFetch(
-          API_ENDPOINTS.BANK_DROP_CASH_DROP(item.drop_entry_id)
+        const token = sessionStorage.getItem('access_token');
+        const response = await fetch(
+          API_ENDPOINTS.BANK_DROP_CASH_DROP(item.drop_entry_id),
+          { headers: { 'Authorization': `Bearer ${token}` } }
         );
         if (response.ok) {
           const cashDrop = await response.json();
@@ -145,10 +148,15 @@ const BankDrop = () => {
 
   const updateBankDroppedStatus = async (cashDropId, status) => {
     try {
-      const response = await authenticatedFetch(
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(
         API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(cashDropId),
         {
           method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ bank_dropped: status })
         }
       );
@@ -177,10 +185,15 @@ const BankDrop = () => {
     if (!selectedCashDrop) return;
     
     try {
-      const response = await authenticatedFetch(
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(
         API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(selectedCashDrop.id),
         {
           method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({
             ...editingDenominations,
             bank_dropped: true
@@ -247,8 +260,13 @@ const BankDrop = () => {
 
     setLoadingSummary(true);
     try {
-      const response = await authenticatedFetch(API_ENDPOINTS.BANK_DROP_SUMMARY, {
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(API_ENDPOINTS.BANK_DROP_SUMMARY, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           cash_drop_ids: nonBankDroppedIds
         })
@@ -274,8 +292,13 @@ const BankDrop = () => {
     if (!summaryData) return;
 
     try {
-      const response = await authenticatedFetch(API_ENDPOINTS.BANK_DROP_MARK_DROPPED, {
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(API_ENDPOINTS.BANK_DROP_MARK_DROPPED, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           cash_drop_ids: Array.from(selectedIds)
         })

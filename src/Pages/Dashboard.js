@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { API_ENDPOINTS } from "../config/api";
-import { authenticatedFetch, checkAuth } from "../utils/auth";
 
 // Color constants
 const COLORS = {
@@ -136,26 +135,13 @@ const Dashboard = () => {
 
     // Check authentication on mount
     useEffect(() => {
-        const checkAuthStatus = async () => {
-            try {
-                const authStatus = await checkAuth();
-                setIsLoggedIn(authStatus.authenticated);
-                if (authStatus.authenticated && authStatus.user) {
-                    setIsAdmin(authStatus.user.is_admin || false);
-                    sessionStorage.setItem('is_admin', String(authStatus.user.is_admin || false)); // Keep for other frontend logic
-                } else {
-                    setIsAdmin(false);
-                    sessionStorage.removeItem('is_admin');
-                }
-            } catch (error) {
-                console.error('Error checking auth:', error);
-                setIsLoggedIn(false);
-                setIsAdmin(false);
-                sessionStorage.removeItem('is_admin');
-            } finally {
-                setAuthChecked(true);
-                setLoading(false);
-            }
+        const checkAuthStatus = () => {
+            const token = sessionStorage.getItem('access_token');
+            const isAdmin = sessionStorage.getItem('is_admin') === 'true';
+            setIsLoggedIn(!!token);
+            setIsAdmin(isAdmin);
+            setAuthChecked(true);
+            setLoading(false);
         };
         checkAuthStatus();
     }, []);
@@ -167,21 +153,36 @@ const Dashboard = () => {
             return;
         }
         try {
-            let response = await authenticatedFetch(API_ENDPOINTS.USERS, {
+            const token = sessionStorage.getItem('access_token');
+            let response = await fetch(API_ENDPOINTS.USERS, {
                 method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
                 });
                 if (refreshResponse.ok) {
-                    response = await authenticatedFetch(API_ENDPOINTS.USERS, {
+                    const refreshData = await refreshResponse.json();
+                    sessionStorage.setItem('access_token', refreshData.access);
+                    response = await fetch(API_ENDPOINTS.USERS, {
                         method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${refreshData.access}`
+                        }
                     });
                 } else {
                     setError("Authentication failed. Please log in again.");
                     setLoading(false);
+                    sessionStorage.clear();
                     return;
                 }
             }
@@ -208,17 +209,31 @@ const Dashboard = () => {
 
     const fetchAdminSettings = async () => {
         try {
-            let response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+            const token = sessionStorage.getItem('access_token');
+            let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                 method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
                 });
                 if (refreshResponse.ok) {
-                    response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+                    const refreshData = await refreshResponse.json();
+                    sessionStorage.setItem('access_token', refreshData.access);
+                    response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                         method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${refreshData.access}`
+                        }
                     });
                 } else {
                     return;
@@ -236,22 +251,39 @@ const Dashboard = () => {
 
     const updateAdminSettings = async () => {
         try {
-            let response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+            const token = sessionStorage.getItem('access_token');
+            let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                 method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(settings),
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
                 });
                 if (refreshResponse.ok) {
-                    response = await authenticatedFetch(API_ENDPOINTS.ADMIN_SETTINGS, {
+                    const refreshData = await refreshResponse.json();
+                    sessionStorage.setItem('access_token', refreshData.access);
+                    response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                         method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${refreshData.access}`
+                        },
                         body: JSON.stringify(settings),
                     });
                 } else {
                     showStatusMessage("Authentication failed. Please log in again.", 'error');
+                    sessionStorage.clear();
                     return;
                 }
             }
@@ -320,18 +352,34 @@ const Dashboard = () => {
         const { name, is_admin } = formData;
         const payload = { name, is_admin };
         try {
-            let response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
+            const token = sessionStorage.getItem('access_token');
+            let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(payload),
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
                 });
                 if (refreshResponse.ok) {
-                    response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
+                    const refreshData = await refreshResponse.json();
+                    sessionStorage.setItem('access_token', refreshData.access);
+                    response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${refreshData.access}`
+                        },
                         body: JSON.stringify(payload),
                     });
                 } else {
@@ -367,20 +415,35 @@ const Dashboard = () => {
         setDeleteModal({ show: false, userId: null, userName: '' });
         
         try {
-            let response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
+            const token = sessionStorage.getItem('access_token');
+            let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshResponse = await authenticatedFetch(API_ENDPOINTS.REFRESH_TOKEN, {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
                 });
                 if (refreshResponse.ok) {
-                    response = await authenticatedFetch(API_ENDPOINTS.USER_BY_ID(userId), {
+                    const refreshData = await refreshResponse.json();
+                    sessionStorage.setItem('access_token', refreshData.access);
+                    response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${refreshData.access}`
+                        }
                     });
                 } else {
                     showStatusMessage("Authentication failed. Please log in again.", 'error');
+                    sessionStorage.clear();
                     return;
                 }
             }

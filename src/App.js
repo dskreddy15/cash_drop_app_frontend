@@ -10,31 +10,21 @@ import Dashboard from './Pages/Dashboard.js';
 import CashDropReconcilerPage from './Pages/CdValidation.js';
 import BankDrop from './Pages/BankDrop.js';
 import { API_ENDPOINTS } from './config/api';
-import { useInactivityTimer } from './hooks/useInactivityTimer.js';
+import useInactivityTimer from './hooks/useInactivityTimer.js';
 
 function App() {
   const navigate = useNavigate();
   const [checkingUsers, setCheckingUsers] = useState(true);
 
   // Handle inactivity logout after 10 minutes
-  const handleInactivityLogout = async () => {
-    try {
-      await fetch(API_ENDPOINTS.LOGOUT, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      navigate('/login');
-    }
+  const handleInactivityLogout = () => {
+    sessionStorage.clear();
+    navigate('/login');
+    alert('You have been logged out due to inactivity.');
   };
 
   // Initialize inactivity timer (10 minutes)
-  useInactivityTimer(10, handleInactivityLogout);
+  useInactivityTimer(10 * 60 * 1000, handleInactivityLogout);
 
   useEffect(() => {
     const checkUserCount = async () => {

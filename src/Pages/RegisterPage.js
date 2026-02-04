@@ -58,12 +58,19 @@ function RegisterPage() {
             // If zero users, force isAdmin to true for first user
             const adminValue = userCount === 0 ? true : isAdmin;
             
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Only add auth token if user is logged in
+            const token = sessionStorage.getItem('access_token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
             const response = await fetch(API_ENDPOINTS.USERS, {
                 method: "POST",
-                credentials: 'include', // Include cookies if logged in
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({ name, email, isAdmin: adminValue }),
             });
             const data = await response.json();

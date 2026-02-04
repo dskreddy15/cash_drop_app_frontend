@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from '../config/api';
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, formatPSTDate } from '../utils/dateUtils';
-import { authenticatedFetch } from '../utils/auth';
 
 function CashDropValidation() {
   const [data, setData] = useState([]);
@@ -67,8 +66,10 @@ function CashDropValidation() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await authenticatedFetch(
-        `${API_ENDPOINTS.CASH_DROP_RECONCILER}?datefrom=${dateFrom}&dateto=${dateTo}`
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(
+        `${API_ENDPOINTS.CASH_DROP_RECONCILER}?datefrom=${dateFrom}&dateto=${dateTo}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
@@ -139,8 +140,13 @@ function CashDropValidation() {
       requestBody.notes = reconciliationNotes[item.id];
     }
 
-    const response = await authenticatedFetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
+    const token = sessionStorage.getItem('access_token');
+    const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(requestBody)
     });
 
@@ -174,8 +180,13 @@ function CashDropValidation() {
     const item = unreconcileModal.item;
     setUnreconcileModal({ show: false, item: null });
 
-    const response = await authenticatedFetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
+    const token = sessionStorage.getItem('access_token');
+    const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ 
         id: item.id, 
         is_reconciled: false
