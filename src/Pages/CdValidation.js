@@ -66,7 +66,7 @@ function CashDropValidation() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(
         `${API_ENDPOINTS.CASH_DROP_RECONCILER}?datefrom=${dateFrom}&dateto=${dateTo}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
@@ -140,7 +140,7 @@ function CashDropValidation() {
       requestBody.notes = reconciliationNotes[item.id];
     }
 
-    const token = sessionStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token');
     const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
       headers: {
@@ -180,7 +180,7 @@ function CashDropValidation() {
     const item = unreconcileModal.item;
     setUnreconcileModal({ show: false, item: null });
 
-    const token = sessionStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token');
     const response = await fetch(API_ENDPOINTS.CASH_DROP_RECONCILER, {
       method: 'PATCH',
       headers: {

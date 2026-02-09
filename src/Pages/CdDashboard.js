@@ -42,9 +42,16 @@ function CdDashboard() {
     { name: 'pennies', value: 0.01, display: 'Pennies ($0.01)' },
   ];
 
+  const ROLL_CONFIG = [
+    { name: 'quarter_rolls', display: 'Quarter Rolls (40 quarters = $10 per roll)', value: 10 },
+    { name: 'dime_rolls', display: 'Dime Rolls (50 dimes = $5 per roll)', value: 5 },
+    { name: 'nickel_rolls', display: 'Nickel Rolls (40 nickels = $2 per roll)', value: 2 },
+    { name: 'penny_rolls', display: 'Penny Rolls (50 pennies = $0.50 per roll)', value: 0.50 },
+  ];
+
   useEffect(() => {
     const checkAuth = () => {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       if (!token) {
         navigate('/login');
         return;
@@ -58,7 +65,7 @@ function CdDashboard() {
     setError('');
     setActiveDate(null);
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const [dropResponse, drawerResponse] = await Promise.all([
         fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${from}&dateto=${to}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -115,6 +122,7 @@ function CdDashboard() {
     fetchData(start, end);
   };
 
+  // Include all dates (drafts will show with blue ribbon)
   const uniqueDates = [...new Set([...cashDrops.map(d => d.date), ...cashDrawers.map(d => d.date)])].sort().reverse();
 
   const formatDateTime = (dateStr, submittedAt) => {
@@ -133,7 +141,7 @@ function CdDashboard() {
     }
 
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(API_ENDPOINTS.IGNORE_CASH_DROP, {
         method: 'PATCH',
         headers: {
@@ -253,8 +261,14 @@ function CdDashboard() {
                         {/* Drop Card */}
                         <div className="h-full">
                           <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
+                            {/* Draft Ribbon */}
+                            {drop.status === 'drafted' && (
+                              <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                DRAFT
+                              </div>
+                            )}
                             {/* Ignored Ribbon */}
-                            {drop.ignored && (
+                            {drop.ignored && drop.status !== 'drafted' && (
                               <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
                                 IGNORED
                               </div>
@@ -291,7 +305,7 @@ function CdDashboard() {
                                 <span className="text-xs italic text-red-700" style={{ fontSize: '14px' }}>{drop.ignore_reason}</span>
                               </div>
                             )}
-                            {!drop.ignored && (
+                            {!drop.ignored && drop.status !== 'drafted' && (
                               <div className="mb-3 md:mb-4">
                                 <button
                                   onClick={() => setIgnoreModal({ show: true, item: drop, reason: '' })}
@@ -313,6 +327,22 @@ function CdDashboard() {
                                 );
                               })}
                             </div>
+                            
+                            {/* Display Coin Rolls - show all roll types, even if zero */}
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <h4 className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Coin Rolls (in Cash Drop):</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                {ROLL_CONFIG.map(roll => {
+                                  const value = drop[roll.name] || 0;
+                                  return (
+                                    <div key={roll.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{roll.display.split(' (')[0]}</span>
+                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -320,8 +350,14 @@ function CdDashboard() {
                         <div className="h-full">
                           {drawer ? (
                             <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
+                              {/* Draft Ribbon - Show if corresponding cash drop is drafted */}
+                              {drop.status === 'drafted' && (
+                                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  DRAFT
+                                </div>
+                              )}
                               {/* Ignored Ribbon - Show if corresponding cash drop is ignored */}
-                              {drop.ignored && (
+                              {drop.ignored && drop.status !== 'drafted' && (
                                 <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
                                   IGNORED
                                 </div>
@@ -343,6 +379,22 @@ function CdDashboard() {
                                     </div>
                                   );
                                 })}
+                              </div>
+                              
+                              {/* Display Coin Rolls - show all roll types, even if zero */}
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <h4 className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Coin Rolls (in Cash Drawer):</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {ROLL_CONFIG.map(roll => {
+                                    const value = drawer[roll.name] || 0;
+                                    return (
+                                      <div key={roll.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                                        <span style={{ color: COLORS.gray, fontSize: '14px' }}>{roll.display.split(' (')[0]}</span>
+                                        <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
                           ) : (

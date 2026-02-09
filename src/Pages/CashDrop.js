@@ -27,15 +27,19 @@ function CashDrop() {
     date: getPSTDate(),
     startingCash: '200.00',
     cashReceivedOnReceipt: 0,
-    pennies: 0, nickels: 0, dimes: 0, quarters: 0, halfDollars: 0,
-    ones: 0, twos: 0, fives: 0, tens: 0, twenties: 0, fifties: 0, hundreds: 0,
+    pennies: '', nickels: '', dimes: '', quarters: '', halfDollars: '',
+    ones: '', twos: '', fives: '', tens: '', twenties: '', fifties: '', hundreds: '',
+    quarterRolls: '', dimeRolls: '', nickelRolls: '', pennyRolls: '',
     notes: ''
   });
+
+  const [rollsModal, setRollsModal] = useState({ show: false, quarterRolls: '', dimeRolls: '', nickelRolls: '', pennyRolls: '' });
 
   const [labelImage, setLabelImage] = useState(null);
   const [cashDropDenominations, setCashDropDenominations] = useState(null);
   const [remainingCashInDrawer, setRemainingCashInDrawer] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
   const [adminSettings, setAdminSettings] = useState({ shifts: [], workstations: [], starting_amount: 200.00, max_cash_drops_per_day: 10 });
@@ -60,7 +64,7 @@ function CashDrop() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
+        const token = localStorage.getItem('access_token');
         if (!token) {
           navigate('/login');
           return;
@@ -72,6 +76,9 @@ function CashDrop() {
         const data = await response.json();
         setFormData(prev => ({ ...prev, employeeName: data.name }));
         setIsAdmin(data.is_admin);
+        // Get user ID from token or response if available
+        // We'll need to decode the token or get it from the response
+        // For now, we'll filter by user in the frontend after fetching
         setLoading(false);
       } catch (err) { navigate('/login'); }
     };
@@ -80,7 +87,7 @@ function CashDrop() {
     // Fetch admin settings
     const fetchSettings = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
+        const token = localStorage.getItem('access_token');
         const response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -97,46 +104,88 @@ function CashDrop() {
     };
     fetchSettings();
 
-    // Load draft from backend or sessionStorage
+    // Load draft from backend or localStorage
     const loadDraft = async () => {
       try {
-        // First check backend for drafts
+        // Fetch both cash drawer and cash drop drafts
         const today = getPSTDate();
-        const token = sessionStorage.getItem('access_token');
-        const draftResponse = await fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${today}&dateto=${today}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const token = localStorage.getItem('access_token');
         
-        if (draftResponse.ok) {
-          const drops = await draftResponse.json();
-          const draft = drops.find(d => d.status === 'drafted');
+        const [drawerResponse, dropResponse] = await Promise.all([
+          fetch(`${API_ENDPOINTS.CASH_DRAWER}?datefrom=${today}&dateto=${today}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${today}&dateto=${today}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        ]);
+        
+        if (drawerResponse.ok && dropResponse.ok) {
+          const drawers = await drawerResponse.json();
+          const drops = await dropResponse.json();
           
-          if (draft) {
-            setDraftId(draft.id);
-            if (draft.drawer_entry_id) {
-              setDraftDrawerId(draft.drawer_entry_id);
+          const drawerDraft = drawers.find(d => d.status === 'drafted');
+          const dropDraft = drops.find(d => d.status === 'drafted');
+          
+          if (drawerDraft || dropDraft) {
+            // Use drawer draft for denominations and basic info
+            const draft = drawerDraft || {};
+            // Use drop draft for ws_label_amount and notes
+            const drop = dropDraft || {};
+            
+            if (drop.id) {
+              setDraftId(drop.id);
+            }
+            if (drawerDraft && drawerDraft.id) {
+              setDraftDrawerId(drawerDraft.id);
+            }
+            if (drop.drawer_entry_id) {
+              setDraftDrawerId(drop.drawer_entry_id);
             }
             
-            // Restore form data from draft
+            // Format date - handle both date strings and Date objects
+            let formattedDate = getPSTDate();
+            const dateSource = draft.date || drop.date;
+            if (dateSource) {
+              if (typeof dateSource === 'string') {
+                // Extract just the date part (YYYY-MM-DD) if it includes time
+                formattedDate = dateSource.split('T')[0];
+              } else {
+                formattedDate = getPSTDate();
+              }
+            }
+            
+            // Handle cashReceivedOnReceipt - use ws_label_amount from cash drop table
+            // If it's 0, show 0; if null/undefined, show empty string; otherwise show the value
+            const cashReceivedValue = drop.ws_label_amount !== null && drop.ws_label_amount !== undefined 
+              ? (drop.ws_label_amount === 0 ? '0' : String(drop.ws_label_amount))
+              : '';
+            
+            // Use drawer draft for denominations (Register Cash Count)
             setFormData(prev => ({
               ...prev,
-              shiftNumber: draft.shift_number || '',
-              workStation: draft.workstation || '',
-              date: draft.date || getPSTDate(),
-              cashReceivedOnReceipt: draft.ws_label_amount || 0,
-              notes: draft.notes || '',
-              hundreds: draft.hundreds || 0,
-              fifties: draft.fifties || 0,
-              twenties: draft.twenties || 0,
-              tens: draft.tens || 0,
-              fives: draft.fives || 0,
-              twos: draft.twos || 0,
-              ones: draft.ones || 0,
-              halfDollars: draft.half_dollars || 0,
-              quarters: draft.quarters || 0,
-              dimes: draft.dimes || 0,
-              nickels: draft.nickels || 0,
-              pennies: draft.pennies || 0
+              shiftNumber: (draft.shift_number || drop.shift_number) || '',
+              workStation: (draft.workstation || drop.workstation) || '',
+              date: formattedDate,
+              cashReceivedOnReceipt: cashReceivedValue,
+              notes: drop.notes || '',
+              // Denominations from cash drawer
+              hundreds: draft.hundreds && draft.hundreds !== 0 ? draft.hundreds : '',
+              fifties: draft.fifties && draft.fifties !== 0 ? draft.fifties : '',
+              twenties: draft.twenties && draft.twenties !== 0 ? draft.twenties : '',
+              tens: draft.tens && draft.tens !== 0 ? draft.tens : '',
+              fives: draft.fives && draft.fives !== 0 ? draft.fives : '',
+              twos: draft.twos && draft.twos !== 0 ? draft.twos : '',
+              ones: draft.ones && draft.ones !== 0 ? draft.ones : '',
+              halfDollars: draft.half_dollars && draft.half_dollars !== 0 ? draft.half_dollars : '',
+              quarters: draft.quarters && draft.quarters !== 0 ? draft.quarters : '',
+              dimes: draft.dimes && draft.dimes !== 0 ? draft.dimes : '',
+              nickels: draft.nickels && draft.nickels !== 0 ? draft.nickels : '',
+              pennies: draft.pennies && draft.pennies !== 0 ? draft.pennies : '',
+              quarterRolls: draft.quarter_rolls && draft.quarter_rolls !== 0 ? draft.quarter_rolls : '',
+              dimeRolls: draft.dime_rolls && draft.dime_rolls !== 0 ? draft.dime_rolls : '',
+              nickelRolls: draft.nickel_rolls && draft.nickel_rolls !== 0 ? draft.nickel_rolls : '',
+              pennyRolls: draft.penny_rolls && draft.penny_rolls !== 0 ? draft.penny_rolls : ''
             }));
             
             setTimeout(() => {
@@ -146,8 +195,8 @@ function CashDrop() {
           }
         }
         
-        // Fallback to sessionStorage
-        const draftData = sessionStorage.getItem('cashDropDraft');
+        // Fallback to localStorage
+        const draftData = localStorage.getItem('cashDropDraft');
         if (draftData) {
           const draft = JSON.parse(draftData);
           // Only restore if we have essential fields
@@ -195,10 +244,14 @@ function CashDrop() {
         starting_cash: parseFloat(formData.startingCash),
         total_cash: parseFloat(calculateTotalCash()),
         status: 'drafted',
-        ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
+        ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, parseFloat(formData[d.field] || 0)])),
+        quarter_rolls: parseFloat(formData.quarterRolls || 0),
+        dime_rolls: parseFloat(formData.dimeRolls || 0),
+        nickel_rolls: parseFloat(formData.nickelRolls || 0),
+        penny_rolls: parseFloat(formData.pennyRolls || 0)
       };
 
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const dRes = await fetch(API_ENDPOINTS.CASH_DRAWER, {
         method: 'POST',
         headers: {
@@ -231,6 +284,12 @@ function CashDrop() {
         dropForm.append(backendKey, cashDropDenominations[key] || 0);
       });
 
+      // Add roll data
+      dropForm.append('quarter_rolls', parseFloat(formData.quarterRolls || 0));
+      dropForm.append('dime_rolls', parseFloat(formData.dimeRolls || 0));
+      dropForm.append('nickel_rolls', parseFloat(formData.nickelRolls || 0));
+      dropForm.append('penny_rolls', parseFloat(formData.pennyRolls || 0));
+
       const dropRes = await fetch(API_ENDPOINTS.CASH_DROP, {
         method: 'POST',
         headers: {
@@ -243,12 +302,12 @@ function CashDrop() {
       const dropResult = await dropRes.json();
       setDraftId(dropResult.id);
       
-      // Also save to sessionStorage for quick restore
+      // Also save to localStorage for quick restore
       const draftData = {
         ...formData,
         labelImage: labelImage ? labelImage.name : null
       };
-      sessionStorage.setItem('cashDropDraft', JSON.stringify(draftData));
+      localStorage.setItem('cashDropDraft', JSON.stringify(draftData));
       
       showStatusMessage('Draft saved successfully.', 'success');
       setIsSubmitting(false);
@@ -269,7 +328,7 @@ function CashDrop() {
           fetch(API_ENDPOINTS.DELETE_CASH_DROP(draftId), {
             method: 'DELETE',
             headers: {
-              'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
             }
           })
         );
@@ -280,7 +339,7 @@ function CashDrop() {
           fetch(API_ENDPOINTS.DELETE_CASH_DRAWER(draftDrawerId), {
             method: 'DELETE',
             headers: {
-              'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
             }
           })
         );
@@ -290,8 +349,8 @@ function CashDrop() {
         await Promise.all(promises);
       }
       
-      // Clear sessionStorage
-      sessionStorage.removeItem('cashDropDraft');
+      // Clear localStorage
+      localStorage.removeItem('cashDropDraft');
       setDraftId(null);
       setDraftDrawerId(null);
       
@@ -303,8 +362,9 @@ function CashDrop() {
         date: getPSTDate(),
         startingCash: adminSettings.starting_amount.toString(),
         cashReceivedOnReceipt: 0,
-        pennies: 0, nickels: 0, dimes: 0, quarters: 0, halfDollars: 0,
-        ones: 0, twos: 0, fives: 0, tens: 0, twenties: 0, fifties: 0, hundreds: 0,
+        pennies: '', nickels: '', dimes: '', quarters: '', halfDollars: '',
+        ones: '', twos: '', fives: '', tens: '', twenties: '', fifties: '', hundreds: '',
+        quarterRolls: '', dimeRolls: '', nickelRolls: '', pennyRolls: '',
         notes: ''
       });
       setLabelImage(null);
@@ -333,17 +393,63 @@ function CashDrop() {
     }
     
     // Parse numeric values for numeric fields (except cashReceivedOnReceipt which should remain as text to allow decimals)
-    const numericFields = ['startingCash', 'pennies', 'nickels', 'dimes', 'quarters', 'halfDollars', 'ones', 'twos', 'fives', 'tens', 'twenties', 'fifties', 'hundreds'];
+    const numericFields = ['startingCash', 'pennies', 'nickels', 'dimes', 'quarters', 'halfDollars', 'ones', 'twos', 'fives', 'tens', 'twenties', 'fifties', 'hundreds', 'quarterRolls', 'dimeRolls', 'nickelRolls', 'pennyRolls'];
     if (numericFields.includes(name)) {
-      const numValue = parseFloat(value) || 0;
-      setFormData(prev => ({ ...prev, [name]: numValue }));
+      // Keep as empty string if value is empty, otherwise parse as number
+      if (value === '') {
+        setFormData(prev => ({ ...prev, [name]: '' }));
+      } else {
+        const numValue = parseFloat(value) || 0;
+        setFormData(prev => ({ ...prev, [name]: numValue }));
+      }
     } else {
       // For cashReceivedOnReceipt and other text fields, keep as string to allow decimal input
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
-  const calculateTotalCash = () => DENOMINATION_CONFIG.reduce((acc, d) => acc + (formData[d.field] * d.value), 0).toFixed(2);
+  const handleRollsModalSave = () => {
+    setFormData(prev => ({
+      ...prev,
+      quarterRolls: rollsModal.quarterRolls === '' ? '' : (parseFloat(rollsModal.quarterRolls) || 0),
+      dimeRolls: rollsModal.dimeRolls === '' ? '' : (parseFloat(rollsModal.dimeRolls) || 0),
+      nickelRolls: rollsModal.nickelRolls === '' ? '' : (parseFloat(rollsModal.nickelRolls) || 0),
+      pennyRolls: rollsModal.pennyRolls === '' ? '' : (parseFloat(rollsModal.pennyRolls) || 0)
+    }));
+    setRollsModal({ show: false, quarterRolls: '', dimeRolls: '', nickelRolls: '', pennyRolls: '' });
+    showStatusMessage('Coin rolls saved successfully.', 'success');
+  };
+
+  const handleRollsModalOpen = () => {
+    setRollsModal({
+      show: true,
+      quarterRolls: formData.quarterRolls === '' || formData.quarterRolls === 0 ? '' : formData.quarterRolls,
+      dimeRolls: formData.dimeRolls === '' || formData.dimeRolls === 0 ? '' : formData.dimeRolls,
+      nickelRolls: formData.nickelRolls === '' || formData.nickelRolls === 0 ? '' : formData.nickelRolls,
+      pennyRolls: formData.pennyRolls === '' || formData.pennyRolls === 0 ? '' : formData.pennyRolls
+    });
+  };
+
+  const calculateTotalCash = () => {
+    // Calculate from individual coins and bills
+    const billsAndCoins = DENOMINATION_CONFIG.reduce((acc, d) => {
+      const value = parseFloat(formData[d.field] || 0);
+      return acc + (value * d.value);
+    }, 0);
+    
+    // Calculate from rolls
+    // Quarter rolls: 40 quarters each = $10 per roll
+    // Dime rolls: 50 dimes each = $5 per roll
+    // Nickel rolls: 40 nickels each = $2 per roll
+    // Penny rolls: 50 pennies each = $0.50 per roll
+    const quarterRollsValue = (parseFloat(formData.quarterRolls || 0) * 40 * 0.25);
+    const dimeRollsValue = (parseFloat(formData.dimeRolls || 0) * 50 * 0.10);
+    const nickelRollsValue = (parseFloat(formData.nickelRolls || 0) * 40 * 0.05);
+    const pennyRollsValue = (parseFloat(formData.pennyRolls || 0) * 50 * 0.01);
+    
+    return (billsAndCoins + quarterRollsValue + dimeRollsValue + nickelRollsValue + pennyRollsValue).toFixed(2);
+  };
+  
   const calculateDropAmount = () => (parseFloat(calculateTotalCash()) - parseFloat(formData.startingCash)).toFixed(2);
   const calculateVariance = () => (parseFloat(calculateDropAmount()) - parseFloat(formData.cashReceivedOnReceipt || 0)).toFixed(2);
 
@@ -380,7 +486,7 @@ function CashDrop() {
   const handleSubmit = async (isDraft = false) => {
     setIsSubmitting(true);
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       
       // Check max cash drops per day (excluding ignored ones and drafts)
       if (!isDraft) {
@@ -405,7 +511,11 @@ function CashDrop() {
         date: formData.date,
         starting_cash: parseFloat(formData.startingCash),
         total_cash: parseFloat(calculateTotalCash()),
-        ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, formData[d.field]]))
+        ...Object.fromEntries(DENOMINATION_CONFIG.map(d => [d.field === 'halfDollars' ? 'half_dollars' : d.field, parseFloat(formData[d.field] || 0)])),
+        quarter_rolls: parseFloat(formData.quarterRolls || 0),
+        dime_rolls: parseFloat(formData.dimeRolls || 0),
+        nickel_rolls: parseFloat(formData.nickelRolls || 0),
+        penny_rolls: parseFloat(formData.pennyRolls || 0)
       };
 
       const dRes = await fetch(API_ENDPOINTS.CASH_DRAWER, {
@@ -417,7 +527,10 @@ function CashDrop() {
         body: JSON.stringify(drawerData),
       });
 
-      if (!dRes.ok) throw new Error('Failed to save Drawer data.');
+      if (!dRes.ok) {
+        const error = await dRes.json();
+        throw new Error('Failed to save Drawer data. ' + error.error);
+      }
       const dResult = await dRes.json();
 
       // 2. Save Drop with Image
@@ -439,6 +552,12 @@ function CashDrop() {
         dropForm.append(backendKey, cashDropDenominations[key]);
       });
 
+      // Add roll data
+      dropForm.append('quarter_rolls', parseFloat(formData.quarterRolls || 0));
+      dropForm.append('dime_rolls', parseFloat(formData.dimeRolls || 0));
+      dropForm.append('nickel_rolls', parseFloat(formData.nickelRolls || 0));
+      dropForm.append('penny_rolls', parseFloat(formData.pennyRolls || 0));
+
       const dropRes = await fetch(API_ENDPOINTS.CASH_DROP, {
         method: 'POST',
         headers: {
@@ -447,10 +566,15 @@ function CashDrop() {
         body: dropForm,
       });
 
-      if (!dropRes.ok) throw new Error('Failed to save Cash Drop & Image.');
+      if (!dropRes.ok) {
+        const error = await dropRes.json();
+        //console.log(error);
+        throw new Error('Failed to save Cash Drop & Image. ' + error.error);
+      }
+        //throw new Error('Failed to save Cash Drop & Image.'); // TODO: Add error message from backend
       
       // Clear draft on successful submission
-      sessionStorage.removeItem('cashDropDraft');
+      localStorage.removeItem('cashDropDraft');
       
       if (isDraft) {
         showStatusMessage('Draft saved successfully.', 'success');
@@ -552,9 +676,56 @@ function CashDrop() {
                 {DENOMINATION_CONFIG.map(d => (
                   <div key={d.field} className="flex justify-between items-center">
                     <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>{d.display}</span>
-                    <input type="text" name={d.field} value={formData[d.field]} onChange={handleChange} className="w-20 p-1 border rounded text-right" style={{ fontSize: '14px' }} />
+                    <input type="text" name={d.field} value={formData[d.field] || ''} onChange={handleChange} className="w-20 p-1 border rounded text-right" style={{ fontSize: '14px' }} />
                   </div>
                 ))}
+              </div>
+              
+              {/* Display Coin Rolls if any are greater than zero */}
+              {((formData.quarterRolls && parseFloat(formData.quarterRolls) > 0) ||
+                (formData.dimeRolls && parseFloat(formData.dimeRolls) > 0) ||
+                (formData.nickelRolls && parseFloat(formData.nickelRolls) > 0) ||
+                (formData.pennyRolls && parseFloat(formData.pennyRolls) > 0)) && (
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Coin Rolls:</h4>
+                  <div className="space-y-2">
+                    {formData.quarterRolls && parseFloat(formData.quarterRolls) > 0 && (
+                      <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Quarter Rolls (40 quarters = $10 per roll):</span>
+                        <span className="font-bold" style={{ color: COLORS.magenta, fontSize: '14px' }}>{formData.quarterRolls} roll(s) = ${(parseFloat(formData.quarterRolls) * 40 * 0.25).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {formData.dimeRolls && parseFloat(formData.dimeRolls) > 0 && (
+                      <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Dime Rolls (50 dimes = $5 per roll):</span>
+                        <span className="font-bold" style={{ color: COLORS.magenta, fontSize: '14px' }}>{formData.dimeRolls} roll(s) = ${(parseFloat(formData.dimeRolls) * 50 * 0.10).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {formData.nickelRolls && parseFloat(formData.nickelRolls) > 0 && (
+                      <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Nickel Rolls (40 nickels = $2 per roll):</span>
+                        <span className="font-bold" style={{ color: COLORS.magenta, fontSize: '14px' }}>{formData.nickelRolls} roll(s) = ${(parseFloat(formData.nickelRolls) * 40 * 0.05).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {formData.pennyRolls && parseFloat(formData.pennyRolls) > 0 && (
+                      <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Penny Rolls (50 pennies = $0.50 per roll):</span>
+                        <span className="font-bold" style={{ color: COLORS.magenta, fontSize: '14px' }}>{formData.pennyRolls} roll(s) = ${(parseFloat(formData.pennyRolls) * 50 * 0.01).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleRollsModalOpen}
+                  className="w-full py-2 text-white font-bold rounded-lg transition uppercase tracking-widest"
+                  style={{ backgroundColor: COLORS.yellowGreen, fontSize: '14px' }}
+                >
+                  Add Coin Rolls
+                </button>
               </div>
               <div className="mt-6 md:mt-8 pt-4 border-t space-y-2">
                 <div className="flex justify-between" style={{ fontSize: '14px' }}><span>Drawer Total:</span> <span className="font-bold">${calculateTotalCash()}</span></div>
@@ -636,7 +807,7 @@ function CashDrop() {
                   >
                     Save as Draft
                   </button>
-                  {(draftId || sessionStorage.getItem('cashDropDraft')) && (
+                  {(draftId || localStorage.getItem('cashDropDraft')) && (
                     <button 
                       onClick={deleteDraft} 
                       className="py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest" 
@@ -651,6 +822,81 @@ function CashDrop() {
           </div>
         </div>
       </div>
+
+      {/* Coin Rolls Modal */}
+      {rollsModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setRollsModal({ ...rollsModal, show: false })}>
+          <div className="bg-white rounded-lg shadow-xl p-6 md:p-8 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()} style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
+            <h3 className="font-black uppercase mb-6 tracking-widest border-b pb-2" style={{ fontSize: '18px', color: COLORS.gray }}>Coin Rolls</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Quarter Rolls (40 quarters = $10 per roll)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rollsModal.quarterRolls}
+                  onChange={(e) => setRollsModal({ ...rollsModal, quarterRolls: e.target.value === '' ? '' : e.target.value })}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-pink-500 outline-none"
+                  style={{ fontSize: '14px' }}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Dime Rolls (50 dimes = $5 per roll)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rollsModal.dimeRolls}
+                  onChange={(e) => setRollsModal({ ...rollsModal, dimeRolls: e.target.value === '' ? '' : e.target.value })}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-pink-500 outline-none"
+                  style={{ fontSize: '14px' }}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Nickel Rolls (40 nickels = $2 per roll)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rollsModal.nickelRolls}
+                  onChange={(e) => setRollsModal({ ...rollsModal, nickelRolls: e.target.value === '' ? '' : e.target.value })}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-pink-500 outline-none"
+                  style={{ fontSize: '14px' }}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Penny Rolls (50 pennies = $0.50 per roll)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rollsModal.pennyRolls}
+                  onChange={(e) => setRollsModal({ ...rollsModal, pennyRolls: e.target.value === '' ? '' : e.target.value })}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-pink-500 outline-none"
+                  style={{ fontSize: '14px' }}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="flex gap-4 mt-6">
+              <button
+                onClick={handleRollsModalSave}
+                className="flex-1 py-2 text-white font-bold rounded-lg transition uppercase tracking-widest"
+                style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setRollsModal({ show: false, quarterRolls: '', dimeRolls: '', nickelRolls: '', pennyRolls: '' })}
+                className="flex-1 py-2 text-white font-bold rounded-lg transition uppercase tracking-widest"
+                style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ function App() {
 
   // Handle inactivity logout after 10 minutes
   const handleInactivityLogout = () => {
-    sessionStorage.clear();
+    localStorage.clear();
     navigate('/login');
     alert('You have been logged out due to inactivity.');
   };

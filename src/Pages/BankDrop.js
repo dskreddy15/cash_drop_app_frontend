@@ -52,7 +52,7 @@ const BankDrop = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(
         `${API_ENDPOINTS.BANK_DROP}?datefrom=${dateFrom}&dateto=${dateTo}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
@@ -111,7 +111,7 @@ const BankDrop = () => {
     // If toggling to true, open modal to edit denominations
     if (newValue) {
       try {
-        const token = sessionStorage.getItem('access_token');
+        const token = localStorage.getItem('access_token');
         const response = await fetch(
           API_ENDPOINTS.BANK_DROP_CASH_DROP(item.drop_entry_id),
           { headers: { 'Authorization': `Bearer ${token}` } }
@@ -148,7 +148,7 @@ const BankDrop = () => {
 
   const updateBankDroppedStatus = async (cashDropId, status) => {
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(
         API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(cashDropId),
         {
@@ -185,7 +185,7 @@ const BankDrop = () => {
     if (!selectedCashDrop) return;
     
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(
         API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(selectedCashDrop.id),
         {
@@ -260,7 +260,7 @@ const BankDrop = () => {
 
     setLoadingSummary(true);
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(API_ENDPOINTS.BANK_DROP_SUMMARY, {
         method: 'POST',
         headers: {
@@ -292,7 +292,7 @@ const BankDrop = () => {
     if (!summaryData) return;
 
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch(API_ENDPOINTS.BANK_DROP_MARK_DROPPED, {
         method: 'POST',
         headers: {

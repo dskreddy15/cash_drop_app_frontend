@@ -31,9 +31,9 @@ function LoginPage() {
             });
             const data = await response.json();
             if (response.ok) {
-                sessionStorage.setItem('access_token', data.access);
-                sessionStorage.setItem('refresh_token', data.refresh);
-                sessionStorage.setItem('is_admin', String(data.is_admin));
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+                localStorage.setItem('is_admin', String(data.is_admin));
                 setMessage("Login successful!");
                 console.log('Login successful, is_admin:', data.is_admin);
                 navigate(data.is_admin ? '/dashboard' : '/cd-dashboard');

@@ -24,8 +24,8 @@ function RegisterPage() {
     const [message, setMessage] = useState("");
     const [userCount, setUserCount] = useState(null);
     const [checkingUsers, setCheckingUsers] = useState(true);
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [isAdminUser, setIsAdminUser] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(true);
+    const [isAdminUser, setIsAdminUser] = useState(true);
 
     useEffect(() => {
         const checkUserCount = async () => {
@@ -63,7 +63,7 @@ function RegisterPage() {
             };
             
             // Only add auth token if user is logged in
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
@@ -103,7 +103,7 @@ function RegisterPage() {
     }
 
     // Allow registration if zero users OR if logged in as admin
-    if (userCount !== null && userCount > 0 && (!isLoggedIn || !isAdminUser)) {
+    if (userCount !== null && userCount > 0 && !isAdminUser && !isLoggedIn) {
         return <Navigate to="/login" />;
     }
 

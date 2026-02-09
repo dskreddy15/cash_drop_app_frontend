@@ -20,15 +20,15 @@ function Header() {
     // Check authentication status on mount and periodically
     useEffect(() => {
         const checkAuthStatus = () => {
-            const token = sessionStorage.getItem('access_token');
-            const isAdmin = sessionStorage.getItem('is_admin') === 'true';
+            const token = localStorage.getItem('access_token');
+            const isAdmin = localStorage.getItem('is_admin') === 'true';
             setIsAuthenticated(!!token);
             setIsAdmin(isAdmin);
         };
         
         checkAuthStatus();
-        // Check every 30 seconds
-        const interval = setInterval(checkAuthStatus, 30000);
+        // Check every hundreth of a seconds
+        const interval = setInterval(checkAuthStatus, 100);
         return () => clearInterval(interval);
     }, []);
 
@@ -43,11 +43,11 @@ function Header() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
                 },
             });
-            // Clear sessionStorage regardless of response
-            sessionStorage.clear();
+            // Clear localStorage regardless of response
+            localStorage.clear();
             setIsAuthenticated(false);
             setIsAdmin(false);
             navigate('/login');
@@ -55,7 +55,7 @@ function Header() {
         } catch (error) {
             console.error("Error during logout:", error);
             // Still clear and navigate on error
-            sessionStorage.clear();
+            localStorage.clear();
             setIsAuthenticated(false);
             setIsAdmin(false);
             navigate('/login');

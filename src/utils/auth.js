@@ -2,10 +2,10 @@ import { API_ENDPOINTS } from '../config/api';
 
 /**
  * Utility function to make authenticated fetch requests
- * Automatically includes Authorization header with token from sessionStorage
+ * Automatically includes Authorization header with token from localStorage
  */
 export const authenticatedFetch = async (url, options = {}) => {
-  const token = sessionStorage.getItem('access_token');
+  const token = localStorage.getItem('access_token');
   
   const defaultOptions = {
     headers: {
@@ -29,10 +29,10 @@ export const authenticatedFetch = async (url, options = {}) => {
   // If access token expired, try to refresh and retry the original request
   if (response.status === 403 || response.status === 401) {
     console.log('Access token expired or invalid, attempting to refresh...');
-    const refreshToken = sessionStorage.getItem('refresh_token');
+    const refreshToken = localStorage.getItem('refresh_token');
     
     if (!refreshToken) {
-      sessionStorage.clear();
+      localStorage.clear();
       window.location.href = '/login';
       return response;
     }
@@ -47,7 +47,7 @@ export const authenticatedFetch = async (url, options = {}) => {
 
     if (refreshResponse.ok) {
       const data = await refreshResponse.json();
-      sessionStorage.setItem('access_token', data.access);
+      localStorage.setItem('access_token', data.access);
       console.log('Token refreshed successfully, retrying original request...');
       
       // Retry the original request with the new access token
@@ -55,7 +55,7 @@ export const authenticatedFetch = async (url, options = {}) => {
       response = await fetch(url, { ...defaultOptions, ...options });
     } else {
       console.error('Failed to refresh token. Logging out.');
-      sessionStorage.clear();
+      localStorage.clear();
       window.location.href = '/login';
       return response;
     }
@@ -69,7 +69,7 @@ export const authenticatedFetch = async (url, options = {}) => {
  */
 export const checkAuth = async () => {
   try {
-    const token = sessionStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
       return { authenticated: false, user: null };
     }

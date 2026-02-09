@@ -136,8 +136,8 @@ const Dashboard = () => {
     // Check authentication on mount
     useEffect(() => {
         const checkAuthStatus = () => {
-            const token = sessionStorage.getItem('access_token');
-            const isAdmin = sessionStorage.getItem('is_admin') === 'true';
+            const token = localStorage.getItem('access_token');
+            const isAdmin = localStorage.getItem('is_admin') === 'true';
             setIsLoggedIn(!!token);
             setIsAdmin(isAdmin);
             setAuthChecked(true);
@@ -153,7 +153,7 @@ const Dashboard = () => {
             return;
         }
         try {
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             let response = await fetch(API_ENDPOINTS.USERS, {
                 method: 'GET',
                 headers: {
@@ -162,7 +162,7 @@ const Dashboard = () => {
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshToken = localStorage.getItem('refresh_token');
                 const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
                     headers: {
@@ -172,7 +172,7 @@ const Dashboard = () => {
                 });
                 if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json();
-                    sessionStorage.setItem('access_token', refreshData.access);
+                    localStorage.setItem('access_token', refreshData.access);
                     response = await fetch(API_ENDPOINTS.USERS, {
                         method: 'GET',
                         headers: {
@@ -182,7 +182,7 @@ const Dashboard = () => {
                 } else {
                     setError("Authentication failed. Please log in again.");
                     setLoading(false);
-                    sessionStorage.clear();
+                    localStorage.clear();
                     return;
                 }
             }
@@ -209,7 +209,7 @@ const Dashboard = () => {
 
     const fetchAdminSettings = async () => {
         try {
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                 method: 'GET',
                 headers: {
@@ -218,7 +218,7 @@ const Dashboard = () => {
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshToken = localStorage.getItem('refresh_token');
                 const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
                     headers: {
@@ -228,7 +228,7 @@ const Dashboard = () => {
                 });
                 if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json();
-                    sessionStorage.setItem('access_token', refreshData.access);
+                    localStorage.setItem('access_token', refreshData.access);
                     response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                         method: 'GET',
                         headers: {
@@ -251,7 +251,7 @@ const Dashboard = () => {
 
     const updateAdminSettings = async () => {
         try {
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             let response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                 method: 'PUT',
                 headers: {
@@ -262,7 +262,7 @@ const Dashboard = () => {
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshToken = localStorage.getItem('refresh_token');
                 const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
                     headers: {
@@ -272,7 +272,7 @@ const Dashboard = () => {
                 });
                 if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json();
-                    sessionStorage.setItem('access_token', refreshData.access);
+                    localStorage.setItem('access_token', refreshData.access);
                     response = await fetch(API_ENDPOINTS.ADMIN_SETTINGS, {
                         method: 'PUT',
                         headers: {
@@ -283,7 +283,7 @@ const Dashboard = () => {
                     });
                 } else {
                     showStatusMessage("Authentication failed. Please log in again.", 'error');
-                    sessionStorage.clear();
+                    localStorage.clear();
                     return;
                 }
             }
@@ -352,7 +352,7 @@ const Dashboard = () => {
         const { name, is_admin } = formData;
         const payload = { name, is_admin };
         try {
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'PUT',
                 headers: {
@@ -363,7 +363,7 @@ const Dashboard = () => {
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshToken = localStorage.getItem('refresh_token');
                 const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
                     headers: {
@@ -373,7 +373,7 @@ const Dashboard = () => {
                 });
                 if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json();
-                    sessionStorage.setItem('access_token', refreshData.access);
+                    localStorage.setItem('access_token', refreshData.access);
                     response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'PUT',
                         headers: {
@@ -415,7 +415,7 @@ const Dashboard = () => {
         setDeleteModal({ show: false, userId: null, userName: '' });
         
         try {
-            const token = sessionStorage.getItem('access_token');
+            const token = localStorage.getItem('access_token');
             let response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'DELETE',
                 headers: {
@@ -424,7 +424,7 @@ const Dashboard = () => {
             });
             if (response.status === 401) {
                 // Try to refresh token
-                const refreshToken = sessionStorage.getItem('refresh_token');
+                const refreshToken = localStorage.getItem('refresh_token');
                 const refreshResponse = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
                     method: 'POST',
                     headers: {
@@ -434,7 +434,7 @@ const Dashboard = () => {
                 });
                 if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json();
-                    sessionStorage.setItem('access_token', refreshData.access);
+                    localStorage.setItem('access_token', refreshData.access);
                     response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                         method: 'DELETE',
                         headers: {
@@ -443,7 +443,7 @@ const Dashboard = () => {
                     });
                 } else {
                     showStatusMessage("Authentication failed. Please log in again.", 'error');
-                    sessionStorage.clear();
+                    localStorage.clear();
                     return;
                 }
             }
