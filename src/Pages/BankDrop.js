@@ -635,19 +635,15 @@ const BankDrop = () => {
 
             <div className="mb-6">
               <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Denomination Totals:</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {DENOMINATION_CONFIG.map(denom => {
                   const count = summaryData.totals[denom.field] || 0;
-                  const value = count * denom.value;
-                  return count > 0 ? (
-                    <div key={denom.field} className="p-3 bg-gray-50 rounded border flex justify-between items-center">
-                      <span className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{denom.display}:</span>
-                      <div className="text-right">
-                        <div className="font-black" style={{ fontSize: '14px' }}>{count} × ${denom.value.toFixed(2)}</div>
-                        <div style={{ color: COLORS.gray, fontSize: '14px' }}>= ${value.toFixed(2)}</div>
-                      </div>
+                  return (
+                    <div key={denom.field} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
+                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
+                      <span className="font-bold" style={{ fontSize: '14px' }}>{count}</span>
                     </div>
-                  ) : null;
+                  );
                 })}
               </div>
             </div>

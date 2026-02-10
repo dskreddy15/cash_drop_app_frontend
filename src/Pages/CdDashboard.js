@@ -13,6 +13,7 @@ function CdDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [ignoreModal, setIgnoreModal] = useState({ show: false, item: null, reason: '' });
+  const [deleteDraftModal, setDeleteDraftModal] = useState({ show: false, item: null });
   const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
 
   // Set page title
@@ -165,6 +166,30 @@ function CdDashboard() {
     }
   };
 
+  const handleDeleteDraft = async () => {
+    if (!deleteDraftModal.item) return;
+
+    try {
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(API_ENDPOINTS.DELETE_CASH_DROP(deleteDraftModal.item.id), {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        showStatusMessage('Draft deleted successfully.', 'success');
+        setDeleteDraftModal({ show: false, item: null });
+        fetchData(selectedDateFrom, selectedDateTo);
+      } else {
+        const error = await response.json();
+        showStatusMessage(error.error || 'Failed to delete draft.', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      showStatusMessage('Error deleting draft: ' + error.message, 'error');
+    }
+  };
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>Loading...</div>;
 
   return (
@@ -253,10 +278,30 @@ function CdDashboard() {
                         <div className="h-full">
                           {drop ? (
                             <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
-                              {/* Ignored Ribbon */}
-                              {drop.ignored && (
+                              {/* Status Ribbon */}
+                              {drop.status === 'drafted' && (
+                                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  DRAFT
+                                </div>
+                              )}
+                              {drop.status === 'submitted' && (
+                                <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  SUBMITTED
+                                </div>
+                              )}
+                              {drop.status === 'ignored' && (
                                 <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
                                   IGNORED
+                                </div>
+                              )}
+                              {drop.status === 'reconciled' && (
+                                <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  RECONCILED
+                                </div>
+                              )}
+                              {drop.status === 'bank_dropped' && (
+                                <div className="absolute top-0 right-0 bg-yellow-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  BANK DROPPED
                                 </div>
                               )}
                               <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
@@ -291,7 +336,7 @@ function CdDashboard() {
                                   <span className="text-xs italic" style={{ color: COLORS.gray, fontSize: '14px' }}>{drop.ignore_reason}</span>
                                 </div>
                               )}
-                              {!drop.ignored && (
+                              {drop.status !== 'drafted' && drop.status !== 'ignored' && (
                                 <div className="mb-3 md:mb-4">
                                   <button
                                     onClick={() => setIgnoreModal({ show: true, item: drop, reason: '' })}
@@ -299,6 +344,24 @@ function CdDashboard() {
                                     style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
                                   >
                                     Ignore Cash Drop
+                                  </button>
+                                </div>
+                              )}
+                              {drop.status === 'drafted' && (
+                                <div className="mb-3 md:mb-4 space-y-2">
+                                  <button
+                                    onClick={() => navigate(`/cash-drop?draftId=${drop.id}`)}
+                                    className="w-full px-3 py-2 text-white font-bold rounded transition-all active:scale-95"
+                                    style={{ backgroundColor: COLORS.yellowGreen, fontSize: '14px' }}
+                                  >
+                                    Edit Draft
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteDraftModal({ show: true, item: drop })}
+                                    className="w-full px-3 py-2 text-white font-bold rounded transition-all active:scale-95"
+                                    style={{ backgroundColor: '#EF4444', fontSize: '14px' }}
+                                  >
+                                    Delete Draft
                                   </button>
                                 </div>
                               )}
@@ -321,6 +384,32 @@ function CdDashboard() {
                         <div className="h-full">
                           {drawer ? (
                             <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
+                              {/* Status Ribbon - Show same status as corresponding cash drop */}
+                              {drop && drop.status === 'drafted' && (
+                                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  DRAFT
+                                </div>
+                              )}
+                              {drop && drop.status === 'submitted' && (
+                                <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  SUBMITTED
+                                </div>
+                              )}
+                              {drop && drop.status === 'ignored' && (
+                                <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  IGNORED
+                                </div>
+                              )}
+                              {drop && drop.status === 'reconciled' && (
+                                <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  RECONCILED
+                                </div>
+                              )}
+                              {drop && drop.status === 'bank_dropped' && (
+                                <div className="absolute top-0 right-0 bg-yellow-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
+                                  BANK DROPPED
+                                </div>
+                              )}
                               {/* Ignored Ribbon - Show if corresponding cash drop is ignored */}
                               {drop && drop.ignored && (
                                 <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
@@ -421,10 +510,54 @@ function CdDashboard() {
                   Cancel
                 </button>
               </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Delete Draft Modal */}
+        {deleteDraftModal.show && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: COLORS.magenta, fontSize: '18px' }}>Delete Draft</h3>
+              <p className="mb-4" style={{ fontSize: '14px', color: COLORS.gray }}>
+                Are you sure you want to delete this draft? This action cannot be undone.
+              </p>
+              {deleteDraftModal.item && (
+                <div className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex justify-between mb-2">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Date:</span>
+                    <span style={{ color: COLORS.gray, fontSize: '14px' }}>{deleteDraftModal.item.date}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Register:</span>
+                    <span style={{ color: COLORS.magenta, fontSize: '14px' }}>{deleteDraftModal.item.workstation}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Amount:</span>
+                    <span style={{ color: COLORS.yellowGreen, fontSize: '14px' }}>${deleteDraftModal.item.drop_amount}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={handleDeleteDraft}
+                  className="px-6 py-2 rounded-lg text-white font-black transition-all active:scale-95"
+                  style={{ backgroundColor: '#EF4444', fontSize: '14px' }}
+                >
+                  Delete Draft
+                </button>
+                <button
+                  onClick={() => setDeleteDraftModal({ show: false, item: null })}
+                  className="px-6 py-2 rounded-lg text-white font-black transition-all active:scale-95"
+                  style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
