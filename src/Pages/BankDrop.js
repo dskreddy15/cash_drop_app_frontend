@@ -17,6 +17,13 @@ const DENOMINATION_CONFIG = [
   { name: 'Pennies', value: 0.01, field: 'pennies', display: 'Pennies ($0.01)' },
 ];
 
+const ROLL_CONFIG = [
+  { name: 'Quarter Rolls', value: 10, field: 'quarter_rolls', display: 'Quarter Rolls (40 quarters = $10 per roll)' },
+  { name: 'Dime Rolls', value: 5, field: 'dime_rolls', display: 'Dime Rolls (50 dimes = $5 per roll)' },
+  { name: 'Nickel Rolls', value: 2, field: 'nickel_rolls', display: 'Nickel Rolls (40 nickels = $2 per roll)' },
+  { name: 'Penny Rolls', value: 0.50, field: 'penny_rolls', display: 'Penny Rolls (50 pennies = $0.50 per roll)' },
+];
+
 const BankDrop = () => {
   // Set page title
   useEffect(() => {
@@ -132,6 +139,10 @@ const BankDrop = () => {
             dimes: cashDrop.dimes || 0,
             nickels: cashDrop.nickels || 0,
             pennies: cashDrop.pennies || 0,
+            quarter_rolls: cashDrop.quarter_rolls || 0,
+            dime_rolls: cashDrop.dime_rolls || 0,
+            nickel_rolls: cashDrop.nickel_rolls || 0,
+            penny_rolls: cashDrop.penny_rolls || 0,
           });
         } else {
           showStatusMessage('Failed to load cash drop details', 'error');
@@ -322,9 +333,17 @@ const BankDrop = () => {
   };
 
   const calculateTotal = (denominations) => {
-    return DENOMINATION_CONFIG.reduce((total, denom) => {
+    // Calculate from bills and coins
+    const billsAndCoins = DENOMINATION_CONFIG.reduce((total, denom) => {
       return total + (denominations[denom.field] || 0) * denom.value;
     }, 0);
+    
+    // Calculate from rolls
+    const rolls = ROLL_CONFIG.reduce((total, roll) => {
+      return total + (denominations[roll.field] || 0) * roll.value;
+    }, 0);
+    
+    return billsAndCoins + rolls;
   };
 
   return (
@@ -564,22 +583,44 @@ const BankDrop = () => {
             
             <h3 className="font-black mb-4" style={{ fontSize: '18px', color: COLORS.gray }}>Edit Denominations - {selectedCashDrop.workstation} | {formatPSTDate(selectedCashDrop.date)}</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {DENOMINATION_CONFIG.map(denom => (
-                <div key={denom.field} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                  <label className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{denom.display}</label>
-                  <input
-                    type="text"
-                    value={editingDenominations[denom.field] || 0}
-                    onChange={(e) => setEditingDenominations({
-                      ...editingDenominations,
-                      [denom.field]: parseInt(e.target.value) || 0
-                    })}
-                    className="w-20 p-2 border rounded text-right font-bold"
-                    style={{ fontSize: '14px' }}
-                  />
-                </div>
-              ))}
+            <div className="mb-6">
+              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Bills & Coins:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {DENOMINATION_CONFIG.map(denom => (
+                  <div key={denom.field} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                    <label className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{denom.display}</label>
+                    <input
+                      type="text"
+                      value={editingDenominations[denom.field] || 0}
+                      onChange={(e) => setEditingDenominations({
+                        ...editingDenominations,
+                        [denom.field]: parseInt(e.target.value) || 0
+                      })}
+                      className="w-20 p-2 border rounded text-right font-bold"
+                      style={{ fontSize: '14px' }}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Coin Rolls:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ROLL_CONFIG.map(roll => (
+                  <div key={roll.field} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                    <label className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{roll.display}</label>
+                    <input
+                      type="text"
+                      value={editingDenominations[roll.field] || 0}
+                      onChange={(e) => setEditingDenominations({
+                        ...editingDenominations,
+                        [roll.field]: parseInt(e.target.value) || 0
+                      })}
+                      className="w-20 p-2 border rounded text-right font-bold"
+                      style={{ fontSize: '14px' }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mb-6 p-4 rounded border" style={{ backgroundColor: COLORS.lightPink + '20', borderColor: COLORS.lightPink }}>
@@ -634,20 +675,37 @@ const BankDrop = () => {
             </p>
 
             <div className="mb-6">
-              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Denomination Totals:</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Bills & Coins Totals:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                 {DENOMINATION_CONFIG.map(denom => {
                   const count = summaryData.totals[denom.field] || 0;
                   const value = count * denom.value;
-                  return count > 0 ? (
-                    <div key={denom.field} className="p-3 bg-gray-50 rounded border flex justify-between items-center">
+                  return (
+                    <div key={denom.field} className={`p-3 rounded border flex justify-between items-center ${count > 0 ? 'bg-gray-50' : 'bg-gray-100 opacity-75'}`}>
                       <span className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{denom.display}:</span>
                       <div className="text-right">
                         <div className="font-black" style={{ fontSize: '14px' }}>{count} × ${denom.value.toFixed(2)}</div>
                         <div style={{ color: COLORS.gray, fontSize: '14px' }}>= ${value.toFixed(2)}</div>
                       </div>
                     </div>
-                  ) : null;
+                  );
+                })}
+              </div>
+              
+              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Coin Rolls Totals:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {ROLL_CONFIG.map(roll => {
+                  const count = summaryData.totals[roll.field] || 0;
+                  const value = count * roll.value;
+                  return (
+                    <div key={roll.field} className={`p-3 rounded border flex justify-between items-center ${count > 0 ? 'bg-gray-50' : 'bg-gray-100 opacity-75'}`}>
+                      <span className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{roll.display.split(' (')[0]}:</span>
+                      <div className="text-right">
+                        <div className="font-black" style={{ fontSize: '14px' }}>{count} roll(s) × ${roll.value.toFixed(2)}</div>
+                        <div style={{ color: COLORS.gray, fontSize: '14px' }}>= ${value.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  );
                 })}
               </div>
             </div>
