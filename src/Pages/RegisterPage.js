@@ -25,12 +25,20 @@ function RegisterPage() {
     const [userCount, setUserCount] = useState(null);
     const [checkingUsers, setCheckingUsers] = useState(true);
     const [isLoggedIn, setIsLoggedIn] = useState(true);
-    const [isAdminUser, setIsAdminUser] = useState(true);
+    const [isAdminUser, setIsAdminUser] = useState(false);
 
     useEffect(() => {
         const checkUserCount = async () => {
             try {
-                const response = await fetch(API_ENDPOINTS.USER_COUNT);
+                const response = await fetch(API_ENDPOINTS.USER_COUNT,
+                    {
+                        mode: 'cors',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
                 if (response.ok) {
                     const data = await response.json();
                     setUserCount(data.count);
@@ -103,7 +111,7 @@ function RegisterPage() {
     }
 
     // Allow registration if zero users OR if logged in as admin
-    if (userCount !== null && userCount > 0 && !isAdminUser && !isLoggedIn) {
+    if (userCount !== null && userCount > 0 && !isLoggedIn) {
         return <Navigate to="/login" />;
     }
 
