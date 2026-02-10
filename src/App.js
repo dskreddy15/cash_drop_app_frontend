@@ -15,12 +15,25 @@ import useInactivityTimer from './hooks/useInactivityTimer.js';
 function App() {
   const navigate = useNavigate();
   const [checkingUsers, setCheckingUsers] = useState(true);
+  const [showInactivityModal, setShowInactivityModal] = useState(false);
+
+  // Color constants
+  const COLORS = {
+    magenta: '#AA056C',
+    yellowGreen: '#48BB78',
+    lightPink: '#F46690',
+    gray: '#64748B'
+  };
 
   // Handle inactivity logout after 10 minutes
   const handleInactivityLogout = () => {
     localStorage.clear();
+    setShowInactivityModal(true);
+  };
+
+  const handleInactivityModalClose = () => {
+    setShowInactivityModal(false);
     navigate('/login');
-    alert('You have been logged out due to inactivity.');
   };
 
   // Initialize inactivity timer (10 minutes)
@@ -72,6 +85,31 @@ function App() {
     <Route path="/cd-validation" element={<CashDropReconcilerPage />} />
     <Route path="/bank-drop" element={<BankDrop />} />
    </Routes>
+
+   {/* Inactivity Logout Modal */}
+   {showInactivityModal && (
+     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
+       <div className="relative max-w-md w-full bg-white rounded-lg shadow-2xl overflow-hidden">
+         <div className="p-4 text-white font-black uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '18px' }}>
+           Session Expired
+         </div>
+         <div className="p-6">
+           <p className="mb-4 font-bold text-center" style={{ color: COLORS.gray, fontSize: '14px' }}>
+             You have been logged out due to inactivity.
+           </p>
+           <div className="flex justify-center">
+             <button
+               onClick={handleInactivityModalClose}
+               className="px-6 py-2 rounded-lg text-white font-black transition-all active:scale-95 uppercase tracking-widest"
+               style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+             >
+               OK
+             </button>
+           </div>
+         </div>
+       </div>
+     </div>
+   )}
    </>
   );
 }
