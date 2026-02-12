@@ -13,8 +13,10 @@ function CdDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [ignoreModal, setIgnoreModal] = useState({ show: false, item: null, reason: '' });
+  const [ignoreDrawerModal, setIgnoreDrawerModal] = useState({ show: false, item: null });
   const [deleteDraftModal, setDeleteDraftModal] = useState({ show: false, item: null });
   const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'drafted' | 'submitted' | 'ignored' | 'reconciled' | 'bank_dropped'
 
   // Set page title
   useEffect(() => {
@@ -117,11 +119,32 @@ function CdDashboard() {
 
   const uniqueDates = [...new Set([...cashDrops.map(d => d.date), ...cashDrawers.map(d => d.date)])].sort().reverse();
 
-  // Helper to group records by index to ensure horizontal row alignment
-  const maxRows = Math.max(
-    cashDrops.filter(d => d.date === activeDate).length,
-    cashDrawers.filter(d => d.date === activeDate).length
-  );
+  // Filter cash drops by status (for display)
+  const dropsPassStatusFilter = (drop) => {
+    if (statusFilter === 'all') return true;
+    return drop.status === statusFilter;
+  };
+
+  // Build rows for activeDate: pair each drop with its drawer via drawer_entry_id (FK), then add standalone drawers
+  const getRowsForActiveDate = () => {
+    if (!activeDate) return [];
+    const dropsForDate = cashDrops.filter(d => d.date === activeDate).filter(dropsPassStatusFilter);
+    const drawersForDate = cashDrawers.filter(d => d.date === activeDate);
+    const drawerById = Object.fromEntries(drawersForDate.map(d => [d.id, d]));
+
+    const rows = dropsForDate.map(drop => ({
+      drop,
+      drawer: drop.drawer_entry_id ? drawerById[drop.drawer_entry_id] || null : null
+    }));
+
+    const linkedDrawerIds = new Set(dropsForDate.map(d => d.drawer_entry_id).filter(Boolean));
+    const standaloneDrawers = drawersForDate.filter(d => !linkedDrawerIds.has(d.id));
+    standaloneDrawers.forEach(drawer => rows.push({ drop: null, drawer }));
+
+    return rows;
+  };
+
+  const rowsForActiveDate = getRowsForActiveDate();
 
   const formatDateTime = (dateStr, submittedAt) => {
     return formatPSTDateTime(dateStr, submittedAt);
@@ -163,6 +186,34 @@ function CdDashboard() {
     } catch (error) {
       console.error('Error ignoring cash drop:', error);
       showStatusMessage('Error ignoring cash drop: ' + error.message, 'error');
+    }
+  };
+
+  const handleIgnoreDrawer = async () => {
+    if (!ignoreDrawerModal.item) return;
+
+    try {
+      const token = sessionStorage.getItem('access_token');
+      const response = await fetch(API_ENDPOINTS.CASH_DRAWER_BY_ID(ignoreDrawerModal.item.id), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'ignored' })
+      });
+
+      if (response.ok) {
+        showStatusMessage('Cash drawer ignored successfully', 'success');
+        setIgnoreDrawerModal({ show: false, item: null });
+        fetchData(selectedDateFrom, selectedDateTo);
+      } else {
+        const error = await response.json();
+        showStatusMessage(error.error || 'Failed to ignore cash drawer', 'error');
+      }
+    } catch (error) {
+      console.error('Error ignoring cash drawer:', error);
+      showStatusMessage('Error ignoring cash drawer: ' + error.message, 'error');
     }
   };
 
@@ -211,6 +262,23 @@ function CdDashboard() {
                 <input type="date" value={selectedDateTo} onChange={e => setSelectedDateTo(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
               </div>
               <button onClick={() => fetchData(selectedDateFrom, selectedDateTo)} className="text-white px-4 md:px-5 py-2 rounded font-bold transition-all" style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}>Fetch Data</button>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500 min-w-[120px]"
+                  style={{ fontSize: '14px' }}
+                >
+                  <option value="all">All</option>
+                  <option value="drafted">Draft</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="ignored">Ignored</option>
+                  <option value="reconciled">Reconciled</option>
+                  <option value="bank_dropped">Bank Dropped</option>
+                </select>
+              </div>
               
               <div className="flex gap-1 border-l pl-2 md:pl-3 border-gray-300">
                 <button onClick={handleWTD} className="px-2 md:px-3 py-2 bg-white border border-gray-300 rounded font-bold hover:bg-gray-50 transition-colors" style={{ fontSize: '14px' }}>WTD</button>
@@ -265,14 +333,15 @@ function CdDashboard() {
                   </div>
                 </div>
 
-                {/* Data Rows: This logic ensures horizontal alignment */}
+                {/* Data Rows: paired by FK (drop.drawer_entry_id -> drawer.id) */}
                 <div className="space-y-4 md:space-y-6">
-                  {[...Array(maxRows)].map((_, index) => {
-                    const drop = cashDrops.filter(d => d.date === activeDate)[index];
-                    const drawer = cashDrawers.filter(d => d.date === activeDate)[index];
+                  {rowsForActiveDate.map((row, index) => {
+                    const drop = row.drop;
+                    const drawer = row.drawer;
+                    const rowKey = drop ? `drop-${drop.id}` : (drawer ? `drawer-${drawer.id}` : `row-${index}`);
 
                     return (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-stretch">
+                      <div key={rowKey} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-stretch">
                         
                         {/* Drop Card */}
                         <div className="h-full">
@@ -384,38 +453,18 @@ function CdDashboard() {
                         <div className="h-full">
                           {drawer ? (
                             <div className="h-full flex flex-col p-4 md:p-5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm relative">
-                              {/* Status Ribbon - Show same status as corresponding cash drop */}
-                              {drop && drop.status === 'drafted' && (
-                                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  DRAFT
-                                </div>
-                              )}
-                              {drop && drop.status === 'submitted' && (
-                                <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  SUBMITTED
-                                </div>
-                              )}
-                              {drop && drop.status === 'ignored' && (
-                                <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  IGNORED
-                                </div>
-                              )}
-                              {drop && drop.status === 'reconciled' && (
-                                <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  RECONCILED
-                                </div>
-                              )}
-                              {drop && drop.status === 'bank_dropped' && (
-                                <div className="absolute top-0 right-0 bg-yellow-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  BANK DROPPED
-                                </div>
-                              )}
-                              {/* Ignored Ribbon - Show if corresponding cash drop is ignored */}
-                              {drop && drop.ignored && (
-                                <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>
-                                  IGNORED
-                                </div>
-                              )}
+                              {/* Status Ribbon - from linked cash drop or drawer's own status (e.g. standalone drawer) */}
+                              {(drop && drop.status === 'drafted') || (!drop && drawer.status === 'drafted') ? (
+                                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>DRAFT</div>
+                              ) : (drop && drop.status === 'submitted') || (!drop && drawer.status === 'submitted') ? (
+                                <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>SUBMITTED</div>
+                              ) : (drop && (drop.status === 'ignored' || drop.ignored)) || drawer.status === 'ignored' ? (
+                                <div className="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>IGNORED</div>
+                              ) : (drop && drop.status === 'reconciled') ? (
+                                <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>RECONCILED</div>
+                              ) : (drop && drop.status === 'bank_dropped') ? (
+                                <div className="absolute top-0 right-0 bg-yellow-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>BANK DROPPED</div>
+                              ) : null}
                               <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
                                 <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '14px' }}>Register {drawer.workstation}</span>
                                 <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.yellowGreen }}>${drawer.total_cash}</span>
@@ -423,6 +472,17 @@ function CdDashboard() {
                               <div className="text-xs font-bold uppercase mb-3 md:mb-4" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                 Initial: ${drawer.starting_cash} | {drawer.user_name}
                               </div>
+                              {drawer.status !== 'ignored' && (
+                                <div className="mb-3 md:mb-4">
+                                  <button
+                                    onClick={() => setIgnoreDrawerModal({ show: true, item: drawer })}
+                                    className="w-full px-3 py-2 text-white font-bold rounded transition-all active:scale-95"
+                                    style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                                  >
+                                    Ignore Drawer
+                                  </button>
+                                </div>
+                              )}
                               <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
                                 {DENOMINATION_CONFIG.map(denom => {
                                   const value = drawer[denom.name] || 0;
@@ -510,6 +570,52 @@ function CdDashboard() {
                   Cancel
                 </button>
               </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ignore Drawer Modal */}
+        {ignoreDrawerModal.show && ignoreDrawerModal.item && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+            <div className="relative max-w-md w-full bg-white rounded-lg shadow-2xl overflow-hidden" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
+              <div className="p-4 text-white font-black uppercase tracking-widest" style={{ backgroundColor: COLORS.magenta, fontSize: '18px' }}>
+                Ignore Cash Drawer
+              </div>
+              <div className="p-6">
+                <p className="mb-4 font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>
+                  Are you sure you want to ignore this cash drawer? Its status will be set to ignored.
+                </p>
+                <div className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex justify-between mb-2">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Date:</span>
+                    <span style={{ color: COLORS.gray, fontSize: '14px' }}>{ignoreDrawerModal.item.date}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Register:</span>
+                    <span style={{ color: COLORS.magenta, fontSize: '14px' }}>{ignoreDrawerModal.item.workstation}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Total Cash:</span>
+                    <span style={{ color: COLORS.yellowGreen, fontSize: '14px' }}>${ignoreDrawerModal.item.total_cash}</span>
+                  </div>
+                </div>
+                <div className="flex justify-center gap-4">
+                  <button
+                    onClick={handleIgnoreDrawer}
+                    className="px-6 py-2 rounded-lg text-white font-black transition-all active:scale-95"
+                    style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+                  >
+                    Confirm Ignore
+                  </button>
+                  <button
+                    onClick={() => setIgnoreDrawerModal({ show: false, item: null })}
+                    className="px-6 py-2 rounded-lg text-white font-black transition-all active:scale-95"
+                    style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>

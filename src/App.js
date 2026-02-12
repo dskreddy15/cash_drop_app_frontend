@@ -16,19 +16,27 @@ function App() {
   const [checkingUsers, setCheckingUsers] = useState(true);
 
   useEffect(() => {
+    const USER_COUNT_TIMEOUT_MS = 10000; // 10 seconds
+
     const checkUserCount = async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.USER_COUNT);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), USER_COUNT_TIMEOUT_MS);
+        const response = await fetch(API_ENDPOINTS.USER_COUNT, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (response.ok) {
           const data = await response.json();
           if (data.count === 0) {
-            // No users exist, redirect to register
             navigate('/register');
           }
         }
       } catch (error) {
-        console.error('Error checking user count:', error);
-        // If we can't check, continue normally
+        if (error.name === 'AbortError') {
+          console.warn('User count request timed out – is the backend running and database reachable?');
+        } else {
+          console.error('Error checking user count:', error);
+        }
+        // Continue to app (e.g. show login) so user isn't stuck
       } finally {
         setCheckingUsers(false);
       }

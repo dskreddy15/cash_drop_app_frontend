@@ -36,25 +36,33 @@ const BankDrop = () => {
   const [dateTo, setDateTo] = useState(getPSTDate());
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedCashDrop, setSelectedCashDrop] = useState(null);
-  const [editingDenominations, setEditingDenominations] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [summaryData, setSummaryData] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingDropBatch, setLoadingDropBatch] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
+  const [batchFilter, setBatchFilter] = useState('all'); // 'all' | 'pending'
+  const [selectedBatchNumbers, setSelectedBatchNumbers] = useState(new Set()); // multi-select batch# for collective view/summary
+  const [showBatchModal, setShowBatchModal] = useState(false); // { type: 'single', item } | { type: 'batch', ids } | false
+  const [customBatchInput, setCustomBatchInput] = useState('');
+  const [droppingSingleId, setDroppingSingleId] = useState(null); // loading state for single-row drop
+  const [batchHistory, setBatchHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const showStatusMessage = (text, type = 'info') => {
     setStatusMessage({ show: true, text, type });
     setTimeout(() => setStatusMessage({ show: false, text: '', type: 'info' }), 5000);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (from, to) => {
+    const f = from !== undefined && from !== null ? from : dateFrom;
+    const t = to !== undefined && to !== null ? to : dateTo;
     setLoading(true);
     const token = sessionStorage.getItem('access_token');
     try {
       const response = await fetch(
-        `${API_ENDPOINTS.BANK_DROP}?datefrom=${dateFrom}&dateto=${dateTo}`,
+        `${API_ENDPOINTS.BANK_DROP}?datefrom=${f}&dateto=${t}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (!response.ok) {
@@ -63,17 +71,16 @@ const BankDrop = () => {
       const result = await response.json();
       const newData = Array.isArray(result) ? result : [];
       setData(newData);
-      
-      // Clean up selectedIds - remove items that are now bank_dropped or no longer exist
+      if (from !== undefined || to !== undefined) {
+        setDateFrom(f);
+        setDateTo(t);
+      }
       setSelectedIds(prev => {
         const updated = new Set();
         const validIds = new Set(newData.map(item => item.drop_entry_id));
         prev.forEach(id => {
           const item = newData.find(d => d.drop_entry_id === id);
-          // Only keep if item exists and is not bank_dropped
-          if (item && !item.bank_dropped && validIds.has(id)) {
-            updated.add(id);
-          }
+          if (item && !item.bank_dropped && validIds.has(id)) updated.add(id);
         });
         return updated;
       });
@@ -87,8 +94,27 @@ const BankDrop = () => {
     }
   };
 
+  const fetchBatchHistory = async () => {
+    setLoadingHistory(true);
+    const token = sessionStorage.getItem('access_token');
+    try {
+      const response = await fetch(API_ENDPOINTS.BANK_DROP_HISTORY, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const list = await response.json();
+        setBatchHistory(Array.isArray(list) ? list : []);
+      }
+    } catch (err) {
+      console.error('Fetch batch history error:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchBatchHistory();
   }, []);
 
   const handleQuickFilter = (type) => {
@@ -105,130 +131,103 @@ const BankDrop = () => {
     fetchData(start, getPSTDate());
   };
 
-  const handleBankDroppedToggle = async (item) => {
-    const newValue = !item.bank_dropped;
-    
-    // If toggling to true, open modal to edit denominations
-    if (newValue) {
-      try {
-        const token = sessionStorage.getItem('access_token');
-        const response = await fetch(
-          API_ENDPOINTS.BANK_DROP_CASH_DROP(item.drop_entry_id),
-          { headers: { 'Authorization': `Bearer ${token}` } }
-        );
-        if (response.ok) {
-          const cashDrop = await response.json();
-          setSelectedCashDrop(cashDrop);
-          setEditingDenominations({
-            hundreds: cashDrop.hundreds || 0,
-            fifties: cashDrop.fifties || 0,
-            twenties: cashDrop.twenties || 0,
-            tens: cashDrop.tens || 0,
-            fives: cashDrop.fives || 0,
-            twos: cashDrop.twos || 0,
-            ones: cashDrop.ones || 0,
-            half_dollars: cashDrop.half_dollars || 0,
-            quarters: cashDrop.quarters || 0,
-            dimes: cashDrop.dimes || 0,
-            nickels: cashDrop.nickels || 0,
-            pennies: cashDrop.pennies || 0,
-          });
+  const openDropModal = (type, payload) => {
+    setCustomBatchInput('');
+    setShowBatchModal({ type, ...payload });
+  };
+
+  const closeBatchModal = () => {
+    setShowBatchModal(false);
+    setCustomBatchInput('');
+    setDroppingSingleId(null);
+  };
+
+  const confirmBatchModal = async () => {
+    if (!showBatchModal) return;
+    const batchNumber = customBatchInput.trim() || undefined;
+    const isSingle = showBatchModal.type === 'single';
+    const ids = isSingle ? [showBatchModal.item.drop_entry_id] : showBatchModal.ids;
+    let updatedIds = [];
+    if (!ids || ids.length === 0) {
+      closeBatchModal();
+      return;
+    }
+    if (isSingle) setDroppingSingleId(ids[0]);
+    else setLoadingDropBatch(true);
+    try {
+      const token = sessionStorage.getItem('access_token');
+      const numericIds = ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id) && id >= 1);
+      if (numericIds.length === 0) {
+        showStatusMessage('No valid cash drop IDs to mark as dropped.', 'error');
+        closeBatchModal();
+        setLoadingDropBatch(false);
+        setDroppingSingleId(null);
+        return;
+      }
+      const body = { cash_drop_ids: numericIds };
+      if (batchNumber) body.batch_number = batchNumber;
+      const response = await fetch(API_ENDPOINTS.BANK_DROP_MARK_DROPPED, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const usedBatch = result.batch_number || '';
+        updatedIds = (result.updated_ids || []).map((id) => Number(id));
+        const numUpdated = result.updated_count ?? updatedIds.length;
+        if (numUpdated === 0) {
+          const errMsg = (result.errors && result.errors.length > 0)
+            ? result.errors.map((e) => e.error).join('; ') || 'No cash drops were updated.'
+            : 'No cash drops were marked as dropped.';
+          showStatusMessage(errMsg, 'error');
+        } else if (isSingle) {
+          showStatusMessage(`Marked as bank dropped. Batch: ${usedBatch}`, 'success');
+          setSelectedIds(prev => { const s = new Set(prev); s.delete(ids[0]); return s; });
         } else {
-          showStatusMessage('Failed to load cash drop details', 'error');
+          const dropText = numUpdated === 1 ? '1 cash drop' : `${numUpdated} cash drops`;
+          showStatusMessage(`Dropped ${dropText}. Batch: ${usedBatch}`, 'success');
+          setSelectedIds(new Set());
         }
-      } catch (error) {
-        console.error('Error loading cash drop:', error);
-        showStatusMessage('Error loading cash drop details', 'error');
-      }
-    } else {
-      // If toggling to false, just update the bank_dropped status
-      await updateBankDroppedStatus(item.drop_entry_id, false);
-    }
-  };
-
-  const updateBankDroppedStatus = async (cashDropId, status) => {
-    try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(
-        API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(cashDropId),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ bank_dropped: status })
-        }
-      );
-      
-      if (response.ok) {
-        // Remove from selectedIds if marking as bank dropped
-        if (status) {
-          setSelectedIds(prev => {
-            const updated = new Set(prev);
-            updated.delete(cashDropId);
-            return updated;
-          });
-        }
-        fetchData(); // Refresh data
-      } else {
-        const err = await response.json();
-        showStatusMessage(err.error || 'Failed to update bank dropped status', 'error');
-      }
-    } catch (error) {
-      console.error('Error updating bank dropped status:', error);
-      showStatusMessage('Error updating bank dropped status', 'error');
-    }
-  };
-
-  const handleSaveDenominations = async () => {
-    if (!selectedCashDrop) return;
-    
-    try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(
-        API_ENDPOINTS.BANK_DROP_UPDATE_DENOMINATIONS(selectedCashDrop.id),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            ...editingDenominations,
-            bank_dropped: true
-          })
-        }
-      );
-      
-      if (response.ok) {
-        // Remove from selectedIds since it's now bank dropped
-        setSelectedIds(prev => {
-          const updated = new Set(prev);
-          updated.delete(selectedCashDrop.id);
-          return updated;
+        const applyBatch = (prev) => prev.map((item) => {
+          const dropId = Number(item.drop_entry_id);
+          return updatedIds.includes(dropId)
+            ? { ...item, bank_dropped: true, bank_drop_batch_number: usedBatch }
+            : item;
         });
-        setSelectedCashDrop(null);
-        setEditingDenominations({});
-        fetchData(); // Refresh data
-        showStatusMessage('Denominations updated and marked as bank dropped', 'success');
+        if (updatedIds.length > 0) {
+          setData(applyBatch);
+          await fetchData();
+          fetchBatchHistory();
+          setTimeout(() => {
+            setData((prev) => applyBatch(prev));
+            if (isSingle) setDroppingSingleId(null);
+          }, 0);
+        } else if (isSingle) {
+          setDroppingSingleId(null);
+        }
       } else {
         const err = await response.json();
-        showStatusMessage(err.error || 'Failed to update denominations', 'error');
+        showStatusMessage(err.error || 'Failed to mark as bank dropped', 'error');
       }
     } catch (error) {
-      console.error('Error saving denominations:', error);
-      showStatusMessage('Error saving denominations', 'error');
+      console.error('Error marking bank dropped:', error);
+      showStatusMessage('Error marking as bank dropped', 'error');
+    } finally {
+      closeBatchModal();
+      setLoadingDropBatch(false);
+      if (updatedIds.length === 0) setDroppingSingleId(null);
     }
   };
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      // Only select items that are NOT bank dropped
+      const source = batchFilter === 'all' || batchFilter === 'pending' ? filteredData : filteredData;
       const nonBankDroppedIds = new Set(
-        data
-          .filter(item => !item.bank_dropped)
-          .map(item => item.drop_entry_id)
+        source.filter(item => !item.bank_dropped).map(item => item.drop_entry_id)
       );
       setSelectedIds(nonBankDroppedIds);
     } else {
@@ -247,12 +246,39 @@ const BankDrop = () => {
   };
 
   const handleGetSummary = async () => {
-    // Filter out items that are already bank dropped
+    if (hasBatchSelection) {
+      setLoadingSummary(true);
+      try {
+        const token = sessionStorage.getItem('access_token');
+        const response = await fetch(API_ENDPOINTS.BANK_DROP_SUMMARY, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ batch_numbers: Array.from(selectedBatchNumbers) })
+        });
+        if (response.ok) {
+          const summary = await response.json();
+          setSummaryData({ ...summary, forConfirm: false, batch_count: selectedBatchNumbers.size });
+          setShowSummaryModal(true);
+        } else {
+          const err = await response.json();
+          showStatusMessage(err.error || 'Failed to get summary', 'error');
+        }
+      } catch (error) {
+        console.error('Error getting summary:', error);
+        showStatusMessage('Error getting summary', 'error');
+      } finally {
+        setLoadingSummary(false);
+      }
+      return;
+    }
+
     const nonBankDroppedIds = Array.from(selectedIds).filter(id => {
       const item = data.find(d => d.drop_entry_id === id);
       return item && !item.bank_dropped;
     });
-
     if (nonBankDroppedIds.length === 0) {
       showStatusMessage('Please select at least one cash drop that is not already bank dropped', 'error');
       return;
@@ -267,14 +293,11 @@ const BankDrop = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          cash_drop_ids: nonBankDroppedIds
-        })
+        body: JSON.stringify({ cash_drop_ids: nonBankDroppedIds })
       });
-
       if (response.ok) {
         const summary = await response.json();
-        setSummaryData(summary);
+        setSummaryData({ ...summary, forConfirm: true });
         setShowSummaryModal(true);
       } else {
         const err = await response.json();
@@ -288,9 +311,24 @@ const BankDrop = () => {
     }
   };
 
-  const handleConfirmBankDrop = async () => {
-    if (!summaryData) return;
+  const getSelectedPendingIds = () =>
+    Array.from(selectedIds).filter(id => {
+      const item = data.find(d => d.drop_entry_id === id);
+      return item && !item.bank_dropped;
+    });
 
+  const handleDropBatch = () => {
+    const ids = getSelectedPendingIds();
+    if (ids.length === 0) {
+      showStatusMessage('Please select at least one pending cash drop to drop as a batch', 'error');
+      return;
+    }
+    openDropModal('batch', { ids });
+  };
+
+  const handleConfirmBankDrop = async () => {
+    if (!summaryData || !summaryData.forConfirm) return;
+    const idsToMark = summaryData.cash_drops?.map(d => d.id) || Array.from(selectedIds);
     try {
       const token = sessionStorage.getItem('access_token');
       const response = await fetch(API_ENDPOINTS.BANK_DROP_MARK_DROPPED, {
@@ -299,18 +337,24 @@ const BankDrop = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          cash_drop_ids: Array.from(selectedIds)
-        })
+        body: JSON.stringify({ cash_drop_ids: idsToMark })
       });
-
       if (response.ok) {
         const result = await response.json();
-        showStatusMessage(`Successfully marked ${result.updated_count} cash drop(s) as bank dropped`, 'success');
+        const batchNumber = result.batch_number || '';
+        showStatusMessage(`Successfully marked ${result.updated_count} cash drop(s) as bank dropped. Batch: ${batchNumber}`, 'success');
         setShowSummaryModal(false);
         setSelectedIds(new Set());
         setSummaryData(null);
-        fetchData(); // Refresh data
+        const updatedIds = (result.updated_ids || []).map((id) => Number(id));
+        const applyBatch = (prev) => prev.map((item) =>
+          updatedIds.includes(Number(item.drop_entry_id))
+            ? { ...item, bank_dropped: true, bank_drop_batch_number: batchNumber }
+            : item
+        );
+        if (updatedIds.length > 0 && batchNumber) setData(applyBatch);
+        await fetchData();
+        if (updatedIds.length > 0 && batchNumber) setData(applyBatch);
       } else {
         const err = await response.json();
         showStatusMessage(err.error || 'Failed to mark as bank dropped', 'error');
@@ -327,8 +371,48 @@ const BankDrop = () => {
     }, 0);
   };
 
+  const hasBatchSelection = selectedBatchNumbers.size > 0;
+  const filteredData = (() => {
+    if (hasBatchSelection) return data.filter(item => selectedBatchNumbers.has(item.bank_drop_batch_number));
+    if (batchFilter === 'pending') return data.filter(item => !item.bank_dropped);
+    return data;
+  })();
+
+  useEffect(() => {
+    if (selectedBatchNumbers.size > 0 && batchHistory.length > 0) {
+      const validBatchNumbers = new Set(batchHistory.map((r) => r.batch_number));
+      setSelectedBatchNumbers(prev => {
+        const next = new Set(prev);
+        let changed = false;
+        next.forEach(b => { if (!validBatchNumbers.has(b)) { next.delete(b); changed = true; } });
+        return changed ? new Set(next) : prev;
+      });
+    }
+  }, [batchHistory]);
+
+  const selectedPendingCount = getSelectedPendingIds().length;
+  const canGetSummary = hasBatchSelection || selectedPendingCount > 0;
+  const canDropBatch = !hasBatchSelection && (batchFilter === 'all' || batchFilter === 'pending') && selectedPendingCount > 0;
+  const getSummaryLabel = () => {
+    if (hasBatchSelection) return `Get Summary (${selectedBatchNumbers.size} batch(es))`;
+    const n = Array.from(selectedIds).filter(id => {
+      const item = data.find(d => d.drop_entry_id === id);
+      return item && !item.bank_dropped;
+    }).length;
+    return `Get Summary (${n})`;
+  };
+
+  const toggleBatchFromHistory = (batchNumber) => {
+    setSelectedBatchNumbers(prev => {
+      const next = new Set(prev);
+      if (next.has(batchNumber)) next.delete(batchNumber);
+      else next.add(batchNumber);
+      return next;
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 p-2 md:p-4" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '14px', color: COLORS.gray }}>
+    <div className="min-h-screen bg-gray-100 py-4 md:py-6" style={{ fontFamily: 'Calibri, Verdana, sans-serif', fontSize: '14px', color: COLORS.gray }}>
       {/* Status Message */}
       {statusMessage.show && (
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
@@ -342,144 +426,221 @@ const BankDrop = () => {
         </div>
       )}
 
-      <div className="max-w-[1600px] mx-auto bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+      {/* Batch# modal for single drop or drop batch */}
+      {showBatchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <h3 className="font-black mb-2" style={{ fontSize: '18px', color: COLORS.gray }}>Bank Drop</h3>
+            <p className="mb-4 text-sm" style={{ color: COLORS.gray }}>
+              {showBatchModal.type === 'single'
+                ? 'Mark this cash drop as bank dropped. Optionally enter a batch# or leave blank to auto-generate.'
+                : `Mark ${showBatchModal.ids.length} selected cash drop(s) as bank dropped with the same batch#. Optionally enter a batch# or leave blank to auto-generate.`}
+            </p>
+            <label className="block text-xs font-black uppercase mb-1" style={{ color: COLORS.gray }}>Batch# (optional)</label>
+            <input
+              type="text"
+              value={customBatchInput}
+              onChange={(e) => setCustomBatchInput(e.target.value)}
+              placeholder="Leave blank for auto"
+              className="w-full p-2 border rounded mb-6"
+              style={{ fontSize: '14px' }}
+              onKeyDown={(e) => e.key === 'Enter' && confirmBatchModal()}
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={confirmBatchModal}
+                className="flex-1 text-white py-2 rounded font-bold"
+                style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={closeBatchModal}
+                className="flex-1 py-2 rounded font-bold border"
+                style={{ backgroundColor: '#fff', color: COLORS.gray, fontSize: '14px', borderColor: COLORS.gray }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-6 px-2 md:px-4">
+        {/* LEFT: main list */}
+        <div className="flex-1 min-w-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
         
         {/* HEADER & FILTERS */}
-        <div className="p-4 md:p-6 border-b bg-white">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 md:gap-6">
-            <div>
-              <h2 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '24px' }}>Bank <span style={{ color: COLORS.magenta }}>Drop</span></h2>
-              <p className="text-xs font-bold tracking-widest uppercase" style={{ color: COLORS.gray, fontSize: '14px' }}>Reconciled Cash Drops for Bank Deposit</p>
+        <div className="p-5 md:p-6 border-b border-gray-100 bg-white">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '24px' }}>Bank <span style={{ color: COLORS.magenta }}>Drop</span></h2>
+                <p className="text-xs font-bold tracking-widest uppercase mt-0.5" style={{ color: COLORS.gray, fontSize: '13px' }}>Reconciled Cash Drops for Bank Deposit</p>
+              </div>
             </div>
-
-            <div className="flex flex-wrap items-end gap-2 md:gap-4 bg-gray-50 p-3 md:p-4 rounded-lg border w-full lg:w-auto">
-              {/* Custom Date Inputs */}
+            {/* One row: From, To, Fetch, WTD, MTD, View All|Pending */}
+            <div className="flex flex-wrap items-end gap-3 md:gap-4 bg-gray-50/80 p-4 rounded-lg border border-gray-100">
               <div className="flex flex-col">
-                <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>From</label>
+                <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '12px' }}>From</label>
                 <input 
                   type="date" 
                   value={dateFrom} 
                   onChange={(e) => setDateFrom(e.target.value)} 
-                  className="p-2 border rounded bg-white" 
+                  className="p-2 border rounded bg-white min-w-[130px]" 
                   style={{ fontSize: '14px' }}
                 />
               </div>
               <div className="flex flex-col">
-                <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>To</label>
+                <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '12px' }}>To</label>
                 <input 
                   type="date" 
                   value={dateTo} 
                   onChange={(e) => setDateTo(e.target.value)} 
-                  className="p-2 border rounded bg-white" 
+                  className="p-2 border rounded bg-white min-w-[130px]" 
                   style={{ fontSize: '14px' }}
                 />
               </div>
-              
               <button 
                 onClick={fetchData} 
-                className="text-white px-3 md:px-4 py-2 rounded font-bold transition"
+                className="text-white px-4 py-2 rounded font-bold transition h-[38px]"
                 style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
               >
                 Fetch
               </button>
-
-              <div className="flex gap-1 border-l pl-2 md:pl-4">
+              <div className="flex gap-1">
                 <button 
                   onClick={() => handleQuickFilter('WTD')} 
-                  className="px-2 md:px-3 py-2 bg-white border rounded font-black hover:bg-gray-50"
+                  className="px-3 py-2 bg-white border rounded font-black hover:bg-gray-50 h-[38px]"
                   style={{ fontSize: '14px' }}
                 >
                   WTD
                 </button>
                 <button 
                   onClick={() => handleQuickFilter('MTD')} 
-                  className="px-2 md:px-3 py-2 bg-white border rounded font-black hover:bg-gray-50"
+                  className="px-3 py-2 bg-white border rounded font-black hover:bg-gray-50 h-[38px]"
                   style={{ fontSize: '14px' }}
                 >
                   MTD
                 </button>
               </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '12px' }}>View</label>
+                <div className="flex rounded border border-gray-300 overflow-hidden bg-white h-[38px]">
+                  <button
+                    type="button"
+                    onClick={() => setBatchFilter('all')}
+                    className={`px-4 py-2 font-bold transition whitespace-nowrap h-full ${batchFilter === 'all' ? 'text-white' : 'bg-white'}`}
+                    style={{
+                      fontSize: '14px',
+                      backgroundColor: batchFilter === 'all' ? COLORS.magenta : 'transparent',
+                      color: batchFilter === 'all' ? '#fff' : COLORS.gray
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchFilter('pending')}
+                    className={`px-4 py-2 font-bold transition whitespace-nowrap h-full ${batchFilter === 'pending' ? 'text-white' : 'bg-white'}`}
+                    style={{
+                      fontSize: '14px',
+                      backgroundColor: batchFilter === 'pending' ? COLORS.magenta : 'transparent',
+                      color: batchFilter === 'pending' ? '#fff' : COLORS.gray
+                    }}
+                  >
+                    Pending
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Selection Controls */}
-          {data.length > 0 && (() => {
-            const nonBankDroppedItems = data.filter(item => !item.bank_dropped);
-            const nonBankDroppedSelected = Array.from(selectedIds).filter(id => {
-              const item = data.find(d => d.drop_entry_id === id);
-              return item && !item.bank_dropped;
-            });
-            const allNonBankDroppedSelected = nonBankDroppedItems.length > 0 && 
-              nonBankDroppedSelected.length === nonBankDroppedItems.length;
-            
-            return (
-              <div className="mt-4 flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4 p-3 rounded-lg" style={{ backgroundColor: COLORS.lightPink + '20' }}>
+          {data.length > 0 && (
+            <div className="mt-4 flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4 p-4 rounded-lg" style={{ backgroundColor: COLORS.lightPink + '15' }}>
+              {!hasBatchSelection ? (
                 <label className="flex items-center gap-2 font-bold" style={{ fontSize: '14px' }}>
                   <input
                     type="checkbox"
-                    checked={allNonBankDroppedSelected}
+                    checked={filteredData.filter(item => !item.bank_dropped).length > 0 &&
+                      filteredData.filter(item => !item.bank_dropped).every(item => selectedIds.has(item.drop_entry_id))}
                     onChange={(e) => handleSelectAll(e.target.checked)}
                     className="w-4 h-4"
                   />
-                  Select All ({nonBankDroppedSelected.length} selected)
+                  Select All ({selectedPendingCount} selected)
                 </label>
-                <button
-                  onClick={handleGetSummary}
-                  disabled={nonBankDroppedSelected.length === 0 || loadingSummary}
-                  className="text-white px-4 md:px-6 py-2 rounded font-bold disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-                  style={{ 
-                    backgroundColor: nonBankDroppedSelected.length === 0 || loadingSummary ? COLORS.gray : COLORS.yellowGreen,
-                    fontSize: '14px'
-                  }}
-                >
-                  {loadingSummary ? 'Loading...' : `Get Summary (${nonBankDroppedSelected.length})`}
-                </button>
-              </div>
-            );
-          })()}
+              ) : null}
+              <button
+                onClick={handleGetSummary}
+                disabled={!canGetSummary || loadingSummary}
+                className="text-white px-4 md:px-6 py-2 rounded font-bold disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                style={{ 
+                  backgroundColor: !canGetSummary || loadingSummary ? COLORS.gray : COLORS.yellowGreen,
+                  fontSize: '14px'
+                }}
+              >
+                {loadingSummary ? 'Loading...' : getSummaryLabel()}
+              </button>
+              <button
+                onClick={handleDropBatch}
+                disabled={!canDropBatch || loadingDropBatch}
+                className="text-white px-4 md:px-6 py-2 rounded font-bold disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                style={{ 
+                  backgroundColor: !canDropBatch || loadingDropBatch ? COLORS.gray : COLORS.magenta,
+                  fontSize: '14px'
+                }}
+                title="Mark all selected pending drops as bank dropped in one batch"
+              >
+                {loadingDropBatch ? 'Dropping...' : `Drop batch (${selectedPendingCount})`}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* DATA TABLE */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto p-2 md:px-4 md:pb-4">
           <table className="w-full text-left min-w-full">
             <thead>
               <tr className="bg-gray-50 font-black uppercase border-b" style={{ color: COLORS.gray }}>
                 <th className="p-2 md:p-4 w-12" style={{ fontSize: '14px' }}>
-                  <input
-                    type="checkbox"
-                    checked={(() => {
-                      const nonBankDroppedItems = data.filter(item => !item.bank_dropped);
-                      const nonBankDroppedSelected = Array.from(selectedIds).filter(id => {
-                        const item = data.find(d => d.drop_entry_id === id);
-                        return item && !item.bank_dropped;
-                      });
-                      return nonBankDroppedItems.length > 0 && 
-                        nonBankDroppedSelected.length === nonBankDroppedItems.length;
-                    })()}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="w-4 h-4"
-                  />
+                  {!hasBatchSelection && (
+                    <input
+                      type="checkbox"
+                      checked={filteredData.filter(item => !item.bank_dropped).length > 0 &&
+                        filteredData.filter(item => !item.bank_dropped).every(item => selectedIds.has(item.drop_entry_id))}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                  )}
                 </th>
+                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Batch#</th>
                 <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Date / Register / Shift</th>
                 <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Reconciled Amount</th>
                 <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Cash Drop Receipt Amount</th>
                 <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Variance</th>
                 <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Bank Dropped</th>
-                <th className="p-2 md:p-4" style={{ fontSize: '14px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {data.length > 0 ? data.map(item => (
+              {filteredData.length > 0 ? filteredData.map(item => (
                 <tr key={item.id} className="border-b hover:bg-pink-50/30 transition-colors">
                   <td className="p-2 md:p-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(item.drop_entry_id)}
-                      onChange={() => handleSelectItem(item.drop_entry_id)}
-                      disabled={item.bank_dropped}
-                      className="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={item.bank_dropped ? 'Already bank dropped - cannot be selected' : ''}
-                    />
+                    {!hasBatchSelection && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.drop_entry_id)}
+                        onChange={() => handleSelectItem(item.drop_entry_id)}
+                        disabled={item.bank_dropped}
+                        className="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={item.bank_dropped ? 'Already bank dropped - cannot be selected' : ''}
+                      />
+                    )}
+                  </td>
+                  <td className="p-2 md:p-4 font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>
+                    {item.bank_drop_batch_number || '—'}
                   </td>
                   <td className="p-2 md:p-4">
                     <div className="font-black" style={{ fontSize: '14px' }}>{formatPSTDate(item.date)}</div>
@@ -511,27 +672,19 @@ const BankDrop = () => {
                     ${item.variance}
                   </td>
                   <td className="p-2 md:p-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={item.bank_dropped || false}
-                        onChange={() => handleBankDroppedToggle(item)}
-                        className="w-5 h-5 rounded focus:ring-2"
-                        style={{ accentColor: COLORS.magenta }}
-                      />
-                      <span className="font-bold" style={{ fontSize: '14px' }}>
-                        {item.bank_dropped ? 'Yes' : 'No'}
+                    {item.bank_dropped ? (
+                      <span className="font-bold inline-block px-2 py-1 rounded" style={{ fontSize: '14px', backgroundColor: COLORS.yellowGreen + '30', color: COLORS.gray }}>
+                        Dropped {item.bank_drop_batch_number ? `· ${item.bank_drop_batch_number}` : ''}
                       </span>
-                    </label>
-                  </td>
-                  <td className="p-2 md:p-4">
-                    {item.bank_dropped && (
+                    ) : (
                       <button
-                        onClick={() => handleBankDroppedToggle(item)}
-                        className="hover:underline font-bold transition-colors"
-                        style={{ color: COLORS.magenta, fontSize: '14px' }}
+                        type="button"
+                        onClick={() => openDropModal('single', { item })}
+                        disabled={droppingSingleId === item.drop_entry_id}
+                        className="px-3 py-1.5 rounded font-bold text-white transition disabled:opacity-50"
+                        style={{ fontSize: '14px', backgroundColor: COLORS.magenta }}
                       >
-                        Edit Denominations
+                        {droppingSingleId === item.drop_entry_id ? 'Dropping...' : 'Drop'}
                       </button>
                     )}
                   </td>
@@ -539,80 +692,94 @@ const BankDrop = () => {
               )) : (
                 <tr>
                   <td colSpan="7" className="p-20 text-center italic font-bold uppercase tracking-widest" style={{ color: COLORS.gray, fontSize: '14px' }}>
-                    {loading ? "Loading Records..." : "No reconciled records found for this period"}
+                    {loading ? "Loading Records..." : hasBatchSelection ? "No records in selected batches" : batchFilter === 'pending' ? "No pending bank drops" : "No reconciled records found for this period"}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+        </div>
 
-      {/* MODAL FOR EDITING DENOMINATIONS */}
-      {selectedCashDrop && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-          <div className="relative max-w-2xl w-full bg-white rounded-lg p-6 overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
-            <button 
-              onClick={() => {
-                setSelectedCashDrop(null);
-                setEditingDenominations({});
-              }}
-              className="absolute top-4 right-4 bg-red-600 text-white w-8 h-8 rounded-full font-bold flex items-center justify-center hover:bg-red-700 z-10"
+        {/* RIGHT: History - select batches to see them in the list */}
+        <div className="lg:w-[360px] flex-shrink-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 bg-gray-50/80 flex flex-row justify-between items-start gap-3">
+            <div className="min-w-0">
+              <h3 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '18px', color: COLORS.gray }}>History</h3>
+              <p className="text-xs font-bold tracking-widest uppercase mt-0.5" style={{ color: COLORS.gray }}>Select batch to see entries in list</p>
+              {hasBatchSelection && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedBatchNumbers(new Set())}
+                  className="mt-2 text-xs font-bold underline hover:no-underline"
+                  style={{ color: COLORS.magenta }}
+                >
+                  Clear selection
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={fetchBatchHistory}
+              disabled={loadingHistory}
+              className="flex-shrink-0 px-3 py-1.5 rounded font-bold text-white text-sm disabled:opacity-50"
+              style={{ backgroundColor: COLORS.magenta }}
             >
-              ✕
+              {loadingHistory ? '...' : 'Refresh'}
             </button>
-            
-            <h3 className="font-black mb-4" style={{ fontSize: '18px', color: COLORS.gray }}>Edit Denominations - {selectedCashDrop.workstation} | {formatPSTDate(selectedCashDrop.date)}</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {DENOMINATION_CONFIG.map(denom => (
-                <div key={denom.field} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                  <label className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>{denom.display}</label>
-                  <input
-                    type="text"
-                    value={editingDenominations[denom.field] || 0}
-                    onChange={(e) => setEditingDenominations({
-                      ...editingDenominations,
-                      [denom.field]: parseInt(e.target.value) || 0
-                    })}
-                    className="w-20 p-2 border rounded text-right font-bold"
-                    style={{ fontSize: '14px' }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="mb-6 p-4 rounded border" style={{ backgroundColor: COLORS.lightPink + '20', borderColor: COLORS.lightPink }}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>Total Amount:</span>
-                <span className="font-black" style={{ fontSize: '18px', color: COLORS.magenta }}>
-                  ${calculateTotal(editingDenominations).toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row gap-4">
-              <button
-                onClick={handleSaveDenominations}
-                className="flex-1 text-white px-4 md:px-6 py-3 rounded-lg font-bold transition"
-                style={{ backgroundColor: COLORS.yellowGreen, fontSize: '14px' }}
-              >
-                Save & Mark as Bank Dropped
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedCashDrop(null);
-                  setEditingDenominations({});
-                }}
-                className="flex-1 text-white px-4 md:px-6 py-3 rounded-lg font-bold transition"
-                style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
-              >
-                Cancel
-              </button>
-            </div>
+          </div>
+          <div className="overflow-auto flex-1 min-h-0">
+            <table className="w-full text-left" style={{ fontSize: '13px' }}>
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="font-black uppercase border-b" style={{ color: COLORS.gray }}>
+                  <th className="p-2 w-8"></th>
+                  <th className="p-2">Batch#</th>
+                  <th className="p-2">Drops</th>
+                  <th className="p-2">Date</th>
+                  <th className="p-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingHistory ? (
+                  <tr>
+                    <td colSpan="5" className="p-4 text-center font-bold" style={{ color: COLORS.gray }}>Loading...</td>
+                  </tr>
+                ) : batchHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-4 text-center italic" style={{ color: COLORS.gray }}>No dropped batches yet</td>
+                  </tr>
+                ) : (
+                  batchHistory.map((row) => (
+                    <tr
+                      key={row.id || row.batch_number}
+                      onClick={() => toggleBatchFromHistory(row.batch_number)}
+                      className={`border-b cursor-pointer transition-colors ${selectedBatchNumbers.has(row.batch_number) ? 'bg-pink-100' : 'hover:bg-pink-50/30'}`}
+                    >
+                      <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedBatchNumbers.has(row.batch_number)}
+                          onChange={() => toggleBatchFromHistory(row.batch_number)}
+                          className="w-4 h-4"
+                          style={{ accentColor: COLORS.magenta }}
+                        />
+                      </td>
+                      <td className="p-2 font-bold" style={{ color: COLORS.magenta }}>{row.batch_number}</td>
+                      <td className="p-2" style={{ color: COLORS.gray }}>{row.drop_count}</td>
+                      <td className="p-2 text-xs" style={{ color: COLORS.gray }}>
+                        {row.created_at ? new Date(row.created_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                      </td>
+                      <td className="p-2 font-bold" style={{ color: COLORS.yellowGreen }}>
+                        {row.batch_drop_amount != null ? `$${Number(row.batch_drop_amount).toFixed(2)}` : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+      </div>
 
       {/* SUMMARY MODAL */}
       {showSummaryModal && summaryData && (
@@ -629,8 +796,11 @@ const BankDrop = () => {
             </button>
             
             <h3 className="font-black mb-4" style={{ fontSize: '18px', color: COLORS.gray }}>Bank Drop Summary</h3>
+            {summaryData.batch_count > 1 && (
+              <p className="mb-2 font-bold uppercase tracking-wide" style={{ fontSize: '12px', color: COLORS.magenta }}>Collective summary for {summaryData.batch_count} batches</p>
+            )}
             <p className="mb-6" style={{ fontSize: '14px', color: COLORS.gray }}>
-              Total Cash Drops: {summaryData.count} | Total Amount: <span className="font-black" style={{ color: COLORS.yellowGreen, fontSize: '18px' }}>${summaryData.total_amount.toFixed(2)}</span>
+              Total Cash Drops: {summaryData.count} | Total Amount: <span className="font-black" style={{ color: COLORS.yellowGreen, fontSize: '18px' }}>${(summaryData.total_amount ?? 0).toFixed(2)}</span>
             </p>
 
             <div className="mb-6">
@@ -658,13 +828,15 @@ const BankDrop = () => {
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">
-              <button
-                onClick={handleConfirmBankDrop}
-                className="flex-1 text-white px-4 md:px-6 py-3 rounded-lg font-bold transition"
-                style={{ backgroundColor: COLORS.yellowGreen, fontSize: '14px' }}
-              >
-                Confirm Bank Drop
-              </button>
+              {summaryData.forConfirm === true && (
+                <button
+                  onClick={handleConfirmBankDrop}
+                  className="flex-1 text-white px-4 md:px-6 py-3 rounded-lg font-bold transition"
+                  style={{ backgroundColor: COLORS.yellowGreen, fontSize: '14px' }}
+                >
+                  Confirm Bank Drop
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowSummaryModal(false);
@@ -673,7 +845,7 @@ const BankDrop = () => {
                 className="flex-1 text-white px-4 md:px-6 py-3 rounded-lg font-bold transition"
                 style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
               >
-                Cancel
+                {summaryData.forConfirm ? 'Cancel' : 'Close'}
               </button>
             </div>
           </div>

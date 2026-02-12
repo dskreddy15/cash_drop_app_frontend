@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
   
   // Bank Drop endpoints
   BANK_DROP: `${API_BASE_URL}/api/bank-drop`,
+  BANK_DROP_HISTORY: `${API_BASE_URL}/api/bank-drop/history`,
   BANK_DROP_CASH_DROP: (id) => `${API_BASE_URL}/api/bank-drop/cash-drop/${id}`,
   BANK_DROP_UPDATE_DENOMINATIONS: (id) => `${API_BASE_URL}/api/bank-drop/cash-drop/${id}/denominations`,
   BANK_DROP_SUMMARY: `${API_BASE_URL}/api/bank-drop/summary`,

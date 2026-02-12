@@ -471,14 +471,14 @@ function CashDrop() {
     const token = sessionStorage.getItem('access_token');
     setIsSubmitting(true);
     try {
-      // Check max cash drops per day (excluding ignored ones)
+      // Check max cash drops per day (excluding drafts and ignored)
       const todayDropsResponse = await fetch(`${API_ENDPOINTS.CASH_DROP}?datefrom=${formData.date}&dateto=${formData.date}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (todayDropsResponse.ok) {
         const todayDrops = await todayDropsResponse.json();
-        const nonIgnoredCount = todayDrops.filter(d => !d.ignored).length;
-        if (nonIgnoredCount >= adminSettings.max_cash_drops_per_day) {
+        const countForLimit = todayDrops.filter(d => d.status !== 'drafted' && d.status !== 'ignored').length;
+        if (countForLimit >= adminSettings.max_cash_drops_per_day) {
           showStatusMessage(`Maximum cash drops per day (${adminSettings.max_cash_drops_per_day}) reached. Please ignore any incorrect entries first.`, 'error');
           setIsSubmitting(false);
           return;
