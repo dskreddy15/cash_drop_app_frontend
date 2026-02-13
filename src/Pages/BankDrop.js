@@ -121,14 +121,20 @@ const BankDrop = () => {
     let start;
     if (type === 'WTD') {
       start = getPSTWeekStart();
+      setDateFrom(start);
+      setDateTo(getPSTDate());
+      fetchData(start, getPSTDate());
     } else if (type === 'MTD') {
       start = getPSTMonthStart();
+      setDateFrom(start);
+      setDateTo(getPSTDate());
+      fetchData(start, getPSTDate());
     } else {
       start = getPSTDate();
+      setDateFrom(start);
+      setDateTo(getPSTDate());
+      fetchData(start, getPSTDate());
     }
-    setDateFrom(start);
-    setDateTo(getPSTDate());
-    fetchData(start, getPSTDate());
   };
 
   const openDropModal = (type, payload) => {
