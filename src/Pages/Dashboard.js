@@ -43,6 +43,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
+                            autoComplete="off"
                             className="shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:ring-2 focus:ring-pink-500"
                             style={{ fontSize: '14px' }}
                             required
@@ -56,6 +57,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                             name="email"
                             value={formData.email}
                             readOnly
+                            autoComplete="off"
                             className="shadow appearance-none border rounded w-full py-2 px-3 leading-tight bg-gray-200"
                             style={{ fontSize: '14px' }}
                         />
@@ -512,6 +514,7 @@ const Dashboard = () => {
                                         onChange={(e) => setNewShift(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && addShift()}
                                         placeholder="Add shift (e.g., 1, 2, 3)"
+                                        autoComplete="off"
                                         className="flex-1 p-2 border rounded"
                                         style={{ fontSize: '14px' }}
                                     />
@@ -549,6 +552,7 @@ const Dashboard = () => {
                                         onChange={(e) => setNewWorkstation(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && addWorkstation()}
                                         placeholder="Add workstation (e.g., Register 1)"
+                                        autoComplete="off"
                                         className="flex-1 p-2 border rounded"
                                         style={{ fontSize: '14px' }}
                                     />
@@ -584,6 +588,7 @@ const Dashboard = () => {
                                     step="0.01"
                                     value={settings.starting_amount}
                                     onChange={(e) => setSettings(prev => ({ ...prev, starting_amount: parseFloat(e.target.value) || 0 }))}
+                                    autoComplete="off"
                                     className="w-full p-2 border rounded"
                                     style={{ fontSize: '14px' }}
                                 />
@@ -596,6 +601,7 @@ const Dashboard = () => {
                                     type="number"
                                     value={settings.max_cash_drops_per_day}
                                     onChange={(e) => setSettings(prev => ({ ...prev, max_cash_drops_per_day: parseInt(e.target.value) || 0 }))}
+                                    autoComplete="off"
                                     className="w-full p-2 border rounded"
                                     style={{ fontSize: '14px' }}
                                 />

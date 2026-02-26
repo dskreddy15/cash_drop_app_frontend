@@ -68,6 +68,7 @@ function LoginPage() {
                                 <input
                                     type="email"
                                     id="email"
+                                    autoComplete="off"
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
                                     style={{ fontSize: '14px' }}
                                     placeholder="test@example.com"
@@ -82,6 +83,7 @@ function LoginPage() {
                                     type="text"
                                     id="totp"
                                     value={totp}
+                                    autoComplete="off"
                                     onChange={(e) => setTotp(e.target.value)}
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
                                     style={{ fontSize: '14px' }}

@@ -707,7 +707,7 @@ function CashDrop() {
             </div>
             <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.magenta, fontSize: '14px' }}>Cash Received on Receipt</label>
-                <input type="text" name="cashReceivedOnReceipt" value={formData.cashReceivedOnReceipt} onChange={handleChange} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.magenta }} />
+                <input type="text" name="cashReceivedOnReceipt" value={formData.cashReceivedOnReceipt} onChange={handleChange} autoComplete="off" className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.magenta }} />
               </div>
             </div>
             
@@ -719,7 +719,7 @@ function CashDrop() {
             </div>
             <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Date</label>
-                <input type="date" name="date" value={formData.date} onChange={handleChange} min={getPSTDate()-2*24*60*60*1000} max={getPSTDate()} className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.gray }} />
+                <input type="date" name="date" value={formData.date} onChange={handleChange} min={getPSTDate()-2*24*60*60*1000} max={getPSTDate()} autoComplete="off" className="p-2 bg-white border-b border-gray-300 font-bold focus:border-pink-600 outline-none" style={{ fontSize: '14px', color: COLORS.gray }} />
             </div>
             <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>Starting Cash</label>
@@ -739,7 +739,7 @@ function CashDrop() {
                   return (
                     <div key={d.field} className="flex justify-between items-center">
                       <span className="text-xs font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>{d.display}</span>
-                      <input type="text" name={d.field} value={isZero ? '' : String(val)} onChange={handleChange} className="w-20 p-1 border rounded text-right" style={{ fontSize: '14px' }} />
+                      <input type="text" name={d.field} value={isZero ? '' : String(val)} onChange={handleChange} autoComplete="off" className="w-20 p-1 border rounded text-right" style={{ fontSize: '14px' }} />
                     </div>
                   );
                 })}
@@ -827,6 +827,7 @@ function CashDrop() {
                   value={formData.notes}
                   onChange={handleChange}
                   rows="4"
+                  autoComplete="off"
                   className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 outline-none"
                   placeholder="Enter any notes or comments about this cash drop..."
                   style={{ fontSize: '14px' }}

@@ -483,6 +483,7 @@ const BankDrop = () => {
               value={customBatchInput}
               onChange={(e) => setCustomBatchInput(e.target.value)}
               placeholder="Leave blank for auto"
+              autoComplete="off"
               className="w-full p-2 border rounded mb-6"
               style={{ fontSize: '14px' }}
               onKeyDown={(e) => e.key === 'Enter' && confirmBatchModal()}
@@ -530,6 +531,7 @@ const BankDrop = () => {
                   type="date" 
                   value={dateFrom} 
                   onChange={(e) => setDateFrom(e.target.value)} 
+                  autoComplete="off"
                   className="p-2 border rounded bg-white min-w-[130px]" 
                   style={{ fontSize: '14px' }}
                 />
@@ -540,6 +542,7 @@ const BankDrop = () => {
                   type="date" 
                   value={dateTo} 
                   onChange={(e) => setDateTo(e.target.value)} 
+                  autoComplete="off"
                   className="p-2 border rounded bg-white min-w-[130px]" 
                   style={{ fontSize: '14px' }}
                 />

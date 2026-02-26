@@ -124,6 +124,7 @@ function RegisterPage() {
                                     type="text"
                                     id="name"
                                     value={name}
+                                    autoComplete="off"
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
                                     style={{ fontSize: '14px' }}
                                     placeholder="Your Name"
@@ -137,6 +138,7 @@ function RegisterPage() {
                                     type="email"
                                     id="email"
                                     value={email}
+                                    autoComplete="off"
                                     className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 block w-full p-2.5 outline-none"
                                     style={{ fontSize: '14px' }}
                                     placeholder="test@example.com"

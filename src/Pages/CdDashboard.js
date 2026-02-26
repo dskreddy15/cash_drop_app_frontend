@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
-import { getPSTDate, getPSTWeekStart, getPSTMonthStart, getPSTYearStart, formatPSTDate, formatPSTDateWithTime } from '../utils/dateUtils';
+import { getPSTDate, getPSTWeekStart, getPSTMonthStart, getPSTMonthEnd, getPSTYearStart, formatPSTDate, formatPSTDateWithTime } from '../utils/dateUtils';
 
 function CdDashboard() {
   const navigate = useNavigate();
   const [selectedDateFrom, setSelectedDateFrom] = useState(getPSTDate());
-  const [selectedDateTo, setSelectedDateTo] = useState(getPSTDate());
+  const [selectedDateTo, setSelectedDateTo] = useState(getPSTMonthEnd());
   const [cashDrops, setCashDrops] = useState([]);
   const [cashDrawers, setCashDrawers] = useState([]);
   const [activeDate, setActiveDate] = useState(null); 
@@ -75,6 +75,12 @@ function CdDashboard() {
     checkAuth();
   }, [navigate]);
 
+  useEffect(() => {
+    const token = sessionStorage.getItem('access_token');
+    if (!token) return;
+    fetchData(selectedDateFrom, selectedDateTo);
+  }, []);
+
   const fetchData = async (from, to) => {
     setError('');
     setActiveDate(null);
@@ -96,10 +102,17 @@ function CdDashboard() {
       const dropData = await dropResponse.json();
       const drawerData = await drawerResponse.json();
       
+      const toYYYYMMDD = (d) => {
+        if (d == null || d === '') return null;
+        if (typeof d === 'string') return d.replace(/T.*$/, '').replace(/\s.*$/, '').trim().slice(0, 10);
+        if (typeof d === 'object' && typeof d.toISOString === 'function') return d.toISOString().slice(0, 10);
+        return String(d).slice(0, 10);
+      };
+      const allDatesRaw = [...dropData.map(d => toYYYYMMDD(d.date)), ...drawerData.map(d => toYYYYMMDD(d.date))].filter(Boolean);
+      const allDates = [...new Set(allDatesRaw)].sort().reverse();
+      
       setCashDrops(dropData);
       setCashDrawers(drawerData);
-      
-      const allDates = [...new Set([...dropData.map(d => d.date), ...drawerData.map(d => d.date)])].sort().reverse();
       if (allDates.length > 0) setActiveDate(allDates[0]);
     } catch (err) {
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
@@ -135,8 +148,13 @@ function CdDashboard() {
     fetchData(start, end);
   };
 
-  // Normalize date to YYYY-MM-DD for consistent comparison (backend may return date or datetime)
-  const normalizeDate = (d) => (d && typeof d === 'string' ? d.replace(/T.*$/, '').trim() : d);
+  // Normalize date to YYYY-MM-DD for consistent comparison (backend may return date or datetime string)
+  const normalizeDate = (d) => {
+    if (d == null || d === '') return null;
+    if (typeof d === 'string') return d.replace(/T.*$/, '').replace(/\s.*$/, '').trim().slice(0, 10);
+    if (typeof d === 'object' && typeof d.toISOString === 'function') return d.toISOString().slice(0, 10);
+    return String(d).slice(0, 10);
+  };
   const uniqueDates = [...new Set([
     ...cashDrops.map(d => normalizeDate(d.date)),
     ...cashDrawers.map(d => normalizeDate(d.date))
@@ -285,11 +303,11 @@ function CdDashboard() {
             <div className="flex flex-wrap items-end gap-2 md:gap-3 p-2 md:p-3 bg-gray-50 rounded-lg border border-gray-200 w-full md:w-auto">
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>From</label>
-                <input type="date" value={selectedDateFrom} onChange={e => setSelectedDateFrom(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
+                <input type="date" value={selectedDateFrom} onChange={e => setSelectedDateFrom(e.target.value)} autoComplete="off" className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>To</label>
-                <input type="date" value={selectedDateTo} onChange={e => setSelectedDateTo(e.target.value)} className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
+                <input type="date" value={selectedDateTo} onChange={e => setSelectedDateTo(e.target.value)} autoComplete="off" className="bg-white border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-pink-500" style={{ fontSize: '14px' }} />
               </div>
               <button onClick={() => fetchData(selectedDateFrom, selectedDateTo)} className="text-white px-4 md:px-5 py-2 rounded font-bold transition-all" style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}>Fetch Data</button>
 
@@ -625,6 +643,7 @@ function CdDashboard() {
                 onChange={(e) => setIgnoreModal(prev => ({ ...prev, reason: e.target.value }))}
                 placeholder="Enter reason for ignoring this cash drop..."
                 rows="4"
+                autoComplete="off"
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-pink-500 outline-none mb-4"
                 style={{ fontSize: '14px', color: COLORS.gray }}
               />

@@ -250,6 +250,27 @@ export const getPSTMonthStart = () => {
 };
 
 /**
+ * Get last day of current month in PST (YYYY-MM-DD).
+ * Useful so dashboard default range includes all days in the month (e.g. seeded future dates).
+ */
+export const getPSTMonthEnd = () => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year').value, 10);
+  const month = parseInt(parts.find(p => p.type === 'month').value, 10);
+  const lastDay = new Date(year, month, 0).getDate();
+  const monthStr = String(month).padStart(2, '0');
+  const dayStr = String(lastDay).padStart(2, '0');
+  return `${year}-${monthStr}-${dayStr}`;
+};
+
+/**
  * Get start of year in PST
  */
 export const getPSTYearStart = () => {

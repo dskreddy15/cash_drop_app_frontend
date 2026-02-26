@@ -288,11 +288,11 @@ function CashDropValidation() {
               {/* Custom Date Inputs */}
               <div className="flex flex-col">
                 <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>From</label>
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="p-2 border rounded bg-white" style={{ fontSize: '14px' }} />
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} autoComplete="off" className="p-2 border rounded bg-white" style={{ fontSize: '14px' }} />
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-black uppercase mb-1" style={{ color: COLORS.gray, fontSize: '14px' }}>To</label>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="p-2 border rounded bg-white" style={{ fontSize: '14px' }} />
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} autoComplete="off" className="p-2 border rounded bg-white" style={{ fontSize: '14px' }} />
               </div>
               
               <button onClick={fetchData} className="text-white px-3 md:px-4 py-2 rounded font-bold transition" style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}>Fetch</button>
@@ -395,6 +395,7 @@ function CashDropValidation() {
                               type="text"
                               className="w-full font-bold outline-none"
                               style={{ fontSize: '14px' }}
+                              autoComplete="off"
                               onChange={(e) => setAdminCounts({...adminCounts, [item.id]: e.target.value})}
                               value={adminCounts[item.id] || ''}
                             />
@@ -467,6 +468,7 @@ function CashDropValidation() {
                                             <input
                                               type="text"
                                               inputMode="numeric"
+                                              autoComplete="off"
                                               className="w-16 p-1 border rounded text-right font-bold bg-white"
                                               style={{ fontSize: '14px' }}
                                               value={isZero ? '' : String(val)}
@@ -500,6 +502,7 @@ function CashDropValidation() {
                                     value={reconciliationNotes[item.id] || ''}
                                     onChange={(e) => setReconciliationNotes({...reconciliationNotes, [item.id]: e.target.value})}
                                     rows="3"
+                                    autoComplete="off"
                                     className="w-full p-2 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 outline-none"
                                     placeholder="Explain the difference between counted amount and drop amount..."
                                     style={{ fontSize: '14px' }}
