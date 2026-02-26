@@ -60,6 +60,10 @@ media/
 # Ignore .git directory (shouldn't be needed but just in case)
 .git/
 
-#Allow public Icons
-!.public/icon-192x192.png
-!.public/icon-512x512.png
+# Allow public folder and key assets (icons, favicon, index, manifest)
+!public/
+!public/*.png
+!public/*.ico
+!public/*.json
+!public/*.html
+!public/*.txt
