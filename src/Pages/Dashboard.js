@@ -756,7 +756,7 @@ const Dashboard = () => {
                                                         className="px-3 py-1 rounded font-bold transition"
                                                         style={{ backgroundColor: COLORS.yellowGreen, color: 'white', fontSize: '14px' }}
                                                     >
-                                                        Regenerate authenticator
+                                                        New QR Code
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteClick(user.id, user.name)}
