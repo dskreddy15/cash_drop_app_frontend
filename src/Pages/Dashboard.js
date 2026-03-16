@@ -120,16 +120,14 @@ const Dashboard = () => {
         workstations: [],
         starting_amount: 200.00,
         max_cash_drops_per_day: 10,
-        cash_drop_date_range: 'last_2_days',
-        cash_drop_only_before_bank_drop: false
+        cash_drop_date_range: 'last_2_days'
     });
     const [originalSettings, setOriginalSettings] = useState({
         shifts: [],
         workstations: [],
         starting_amount: 200.00,
         max_cash_drops_per_day: 10,
-        cash_drop_date_range: 'last_2_days',
-        cash_drop_only_before_bank_drop: false
+        cash_drop_date_range: 'last_2_days'
     });
     const [newShift, setNewShift] = useState('');
     const [newWorkstation, setNewWorkstation] = useState('');
@@ -667,21 +665,6 @@ const Dashboard = () => {
                                     <option value="last_2_days">Last 2 days (today + yesterday)</option>
                                     <option value="all_previous">All previous days</option>
                                 </select>
-                            </div>
-
-                            {/* Only before bank drop */}
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="cash_drop_only_before_bank_drop"
-                                    checked={settings.cash_drop_only_before_bank_drop}
-                                    onChange={(e) => setSettings(prev => ({ ...prev, cash_drop_only_before_bank_drop: e.target.checked }))}
-                                    className="w-4 h-4"
-                                    style={{ accentColor: COLORS.magenta }}
-                                />
-                                <label htmlFor="cash_drop_only_before_bank_drop" className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>
-                                    Only allow cash drop for days where bank drop is not done
-                                </label>
                             </div>
                         </div>
                         <div className="mt-6">
