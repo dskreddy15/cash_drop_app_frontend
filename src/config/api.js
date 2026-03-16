@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
   CURRENT_USER: `${API_BASE_URL}/api/auth/users/me`,
   USERS: `${API_BASE_URL}/api/auth/users`,
   USER_BY_ID: (id) => `${API_BASE_URL}/api/auth/users/${id}`,
+  REGENERATE_AUTHENTICATOR: (id) => `${API_BASE_URL}/api/auth/users/${id}/regenerate-authenticator`,
   
   // Cash Drop App endpoints
   CASH_DRAWER: `${API_BASE_URL}/api/cash-drop-app1/cash-drawer`,

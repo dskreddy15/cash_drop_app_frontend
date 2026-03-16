@@ -49,7 +49,8 @@ function CashDrop() {
   const [calendarDates, setCalendarDates] = useState([]);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [pickerView, setPickerView] = useState({ year: null, month: null }); // month 1-12, when open
-  
+  const [duplicateDropWarning, setDuplicateDropWarning] = useState(null); // message if a drop already exists for this shift/register/date
+
   const DENOMINATION_CONFIG = [
     { name: 'Hundreds', value: 100, field: 'hundreds', display: 'Hundreds ($100)' },
     { name: 'Fifties', value: 50, field: 'fifties', display: 'Fifties ($50)' },
@@ -303,6 +304,46 @@ function CashDrop() {
     };
     fetchCalendar();
   }, [calendarTarget.year, calendarTarget.month]);
+
+  // Check for existing drop when shift + register + date are set (early warning)
+  useEffect(() => {
+    const { shiftNumber, workStation, date } = formData;
+    if (!shiftNumber || !workStation || !date) {
+      setDuplicateDropWarning(null);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      const token = sessionStorage.getItem('access_token');
+      if (!token) {
+        setDuplicateDropWarning(null);
+        return;
+      }
+      try {
+        const res = await fetch(API_ENDPOINTS.CASH_DROP_VALIDATE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            workstation: workStation,
+            shift_number: shiftNumber,
+            date,
+            ...(draftId != null && { draftId }),
+          }),
+        });
+        if (cancelled) return;
+        if (res.status === 400) {
+          const data = await res.json().catch(() => ({}));
+          setDuplicateDropWarning(data.error || 'A cash drop already exists for this shift, register, and date.');
+        } else {
+          setDuplicateDropWarning(null);
+        }
+      } catch (e) {
+        if (!cancelled) setDuplicateDropWarning(null);
+      }
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [formData.shiftNumber, formData.workStation, formData.date, draftId]);
 
   // --- HELPERS ---
   const showStatusMessage = (text, type = 'info') => {
@@ -857,6 +898,44 @@ function CashDrop() {
               </div>
             </div>
           </div>
+
+          {/* Early warning: a cash drop already exists for this shift/register/date */}
+          {duplicateDropWarning && (
+            <div
+              className="mb-4 p-4 rounded-lg"
+              role="alert"
+              style={{
+                backgroundColor: '#FEF3C7',
+                border: '2px solid #D97706',
+                color: '#92400E',
+              }}
+            >
+              <p style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
+                A cash drop already exists for this combination.
+              </p>
+              <p style={{ fontSize: '13px', margin: 0 }}>{duplicateDropWarning}</p>
+            </div>
+          )}
+
+          {/* Early warning: cannot add cash drop for this date (show as soon as shift + workstation + date are set) */}
+          {formData.shiftNumber && formData.workStation && formData.date && selectedDateInfo && selectedDateInfo.canCashDrop === false && (
+            <div
+              className="mb-6 p-4 rounded-lg"
+              role="alert"
+              style={{
+                backgroundColor: '#FEE2E2',
+                border: '2px solid #DC2626',
+                color: '#991B1B',
+              }}
+            >
+              <p style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
+                You cannot add a cash drop for this date.
+              </p>
+              <p style={{ fontSize: '13px', margin: 0 }}>
+                The selected date ({formData.date}) is not allowed by current admin settings (allowed date range or bank drop rule). Choose a different date from the calendar above or contact an admin.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 items-start">
             {/* Input Column */}

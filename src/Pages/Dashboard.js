@@ -109,6 +109,7 @@ const Dashboard = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [deleteModal, setDeleteModal] = useState({ show: false, userId: null, userName: '' });
+    const [regenerateAuthModal, setRegenerateAuthModal] = useState({ show: false, userName: '', userEmail: '', secret: null, qr_code: null, loading: false });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });
@@ -405,6 +406,49 @@ const Dashboard = () => {
         setDeleteModal({ show: true, userId, userName: user ? user.name : '' });
     };
 
+    const handleRegenerateAuthenticatorClick = (user) => {
+        setRegenerateAuthModal({ show: true, userName: user.name, userEmail: user.email, secret: null, qr_code: null, loading: true, userId: user.id });
+        const doRegenerate = async () => {
+            let accessToken = sessionStorage.getItem('access_token');
+            if (!accessToken) {
+                showStatusMessage("No access token found. Please log in again.", 'error');
+                setRegenerateAuthModal(prev => ({ ...prev, show: false, loading: false }));
+                return;
+            }
+            try {
+                let response = await fetch(API_ENDPOINTS.REGENERATE_AUTHENTICATOR(user.id), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                });
+                if (response.status === 401) {
+                    accessToken = await refreshToken();
+                    if (accessToken) {
+                        response = await fetch(API_ENDPOINTS.REGENERATE_AUTHENTICATOR(user.id), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                        });
+                    } else {
+                        showStatusMessage("Authentication failed. Please log in again.", 'error');
+                        setRegenerateAuthModal(prev => ({ ...prev, show: false, loading: false }));
+                        return;
+                    }
+                }
+                if (response.ok) {
+                    const data = await response.json();
+                    setRegenerateAuthModal(prev => ({ ...prev, secret: data.secret, qr_code: data.qr_code || null, loading: false }));
+                } else {
+                    const errorData = await response.json();
+                    showStatusMessage(errorData.error || 'Failed to regenerate authenticator', 'error');
+                    setRegenerateAuthModal(prev => ({ ...prev, show: false, loading: false }));
+                }
+            } catch (err) {
+                showStatusMessage("Error: " + err.message, 'error');
+                setRegenerateAuthModal(prev => ({ ...prev, show: false, loading: false }));
+            }
+        };
+        doRegenerate();
+    };
+
     const handleDeleteConfirm = async () => {
         if (!deleteModal.userId) return;
         
@@ -699,13 +743,20 @@ const Dashboard = () => {
                                                 )}
                                             </td>
                                             <td className="p-2 md:p-4">
-                                                <div className="flex flex-col md:flex-row gap-2">
+                                                <div className="flex flex-col md:flex-row gap-2 flex-wrap">
                                                     <button
                                                         onClick={() => handleEdit(user)}
                                                         className="px-3 py-1 rounded font-bold transition"
                                                         style={{ backgroundColor: COLORS.lightPink, color: 'white', fontSize: '14px' }}
                                                     >
                                                         Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRegenerateAuthenticatorClick(user)}
+                                                        className="px-3 py-1 rounded font-bold transition"
+                                                        style={{ backgroundColor: COLORS.yellowGreen, color: 'white', fontSize: '14px' }}
+                                                    >
+                                                        Regenerate authenticator
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteClick(user.id, user.name)}
@@ -789,6 +840,53 @@ const Dashboard = () => {
                                     Cancel
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Regenerate authenticator modal: show new QR + secret for user to re-add to app */}
+            {regenerateAuthModal.show && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="relative max-w-md w-full bg-white rounded-lg shadow-2xl overflow-hidden">
+                        <div className="p-4" style={{ backgroundColor: COLORS.yellowGreen }}>
+                            <h3 className="text-white font-black uppercase tracking-widest text-center" style={{ fontSize: '18px' }}>
+                                Regenerate authenticator
+                            </h3>
+                        </div>
+                        <div className="p-6">
+                            <p className="mb-3 text-center" style={{ fontSize: '14px', color: COLORS.gray }}>
+                                New code for <strong>{regenerateAuthModal.userName}</strong> ({regenerateAuthModal.userEmail}). Have them add it to Google Authenticator again.
+                            </p>
+                            {regenerateAuthModal.loading ? (
+                                <div className="flex justify-center py-8">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: COLORS.magenta }}></div>
+                                </div>
+                            ) : (
+                                <>
+                                    {regenerateAuthModal.qr_code && (
+                                        <div className="flex justify-center mb-4">
+                                            <img src={regenerateAuthModal.qr_code} alt="QR code for authenticator" className="w-48 h-48 border border-gray-200 rounded" />
+                                        </div>
+                                    )}
+                                    {regenerateAuthModal.secret && (
+                                        <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+                                            <p className="text-xs font-bold uppercase mb-1" style={{ color: COLORS.gray }}>Secret (manual entry)</p>
+                                            <p className="font-mono text-sm break-all select-all" style={{ color: COLORS.gray }}>{regenerateAuthModal.secret}</p>
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-center mb-4" style={{ color: COLORS.gray }}>
+                                        The old authenticator code for this account will stop working. User must add this new one in their app.
+                                    </p>
+                                </>
+                            )}
+                            <button
+                                onClick={() => setRegenerateAuthModal({ show: false, userName: '', userEmail: '', secret: null, qr_code: null, loading: false })}
+                                className="w-full text-white font-black px-4 py-3 rounded-lg shadow-md uppercase tracking-widest"
+                                style={{ backgroundColor: COLORS.gray, fontSize: '14px' }}
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
