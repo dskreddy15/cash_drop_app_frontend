@@ -1,6 +1,22 @@
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+/** Call when session is expired (401). Clears storage and notifies app to redirect to login. */
+export function clearSessionAndRedirectToLogin() {
+  sessionStorage.clear();
+  window.dispatchEvent(new CustomEvent('sessionExpired'));
+}
+
+/** Wrap fetch so 401 with an existing token clears session and triggers redirect to login. */
+const originalFetch = window.fetch;
+window.fetch = async function (...args) {
+  const res = await originalFetch.apply(this, args);
+  if (res.status === 401 && sessionStorage.getItem('access_token')) {
+    clearSessionAndRedirectToLogin();
+  }
+  return res;
+};
+
 export const API_ENDPOINTS = {
   // Auth endpoints
   USER_COUNT: `${API_BASE_URL}/api/auth/user-count/`,

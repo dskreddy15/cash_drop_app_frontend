@@ -28,7 +28,9 @@ function CashDropValidation() {
     { name: 'twenties', value: 20, display: 'Twenties ($20)' },
     { name: 'tens', value: 10, display: 'Tens ($10)' },
     { name: 'fives', value: 5, display: 'Fives ($5)' },
+    { name: 'twos', value: 2, display: 'Twos ($2)' },
     { name: 'ones', value: 1, display: 'Ones ($1)' },
+    { name: 'half_dollars', value: 0.5, display: 'Half Dollars ($0.50)' },
     { name: 'quarters', value: 0.25, display: 'Quarters ($0.25)' },
     { name: 'dimes', value: 0.10, display: 'Dimes ($0.10)' },
     { name: 'nickels', value: 0.05, display: 'Nickels ($0.05)' },
@@ -108,7 +110,7 @@ function CashDropValidation() {
     if (!denoms) return 0;
     const denomSum = DENOMINATION_CONFIG.reduce((sum, d) => sum + (parseFloat(denoms[d.name]) || 0) * d.value, 0);
     const rollsSum = ROLLS_DISPLAY.reduce((sum, d) => sum + (parseFloat(denoms[d.name]) || 0) * d.value, 0);
-    return denomSum + rollsSum;
+    return Math.round((denomSum + rollsSum) * 100) / 100;
   };
 
   const handleReconcile = async (item, withDelta = false) => {

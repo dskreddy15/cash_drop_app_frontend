@@ -9,11 +9,48 @@ import CdDashboard from './Pages/CdDashboard.js';
 import Dashboard from './Pages/Dashboard.js';
 import CashDropReconcilerPage from './Pages/CdValidation.js';
 import BankDrop from './Pages/BankDrop.js';
-import { API_ENDPOINTS } from './config/api';
+import { API_ENDPOINTS, clearSessionAndRedirectToLogin } from './config/api';
 
 function App() {
   const navigate = useNavigate();
   const [checkingUsers, setCheckingUsers] = useState(true);
+  const [sessionValid, setSessionValid] = useState(true); // force Header re-render when session expires
+
+  // When any part of the app gets 401, redirect to login (sessionExpired is dispatched from api.js)
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setSessionValid(false);
+      navigate('/login', { replace: true });
+    };
+    const onSessionRestored = () => setSessionValid(true);
+    window.addEventListener('sessionExpired', onSessionExpired);
+    window.addEventListener('sessionRestored', onSessionRestored);
+    return () => {
+      window.removeEventListener('sessionExpired', onSessionExpired);
+      window.removeEventListener('sessionRestored', onSessionRestored);
+    };
+  }, [navigate]);
+
+  // When user returns to the tab, validate session so expired token doesn’t keep showing app content
+  useEffect(() => {
+    const validateSession = async () => {
+      const token = sessionStorage.getItem('access_token');
+      if (!token) return;
+      try {
+        const res = await fetch(API_ENDPOINTS.CURRENT_USER, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) {
+          clearSessionAndRedirectToLogin();
+        }
+      } catch {
+        // ignore network errors; don’t log out on offline
+      }
+    };
+    const onVisible = () => validateSession();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   useEffect(() => {
     const USER_COUNT_TIMEOUT_MS = 10000; // 10 seconds
@@ -58,7 +95,7 @@ function App() {
 
   return (
    <>
-    <Header />
+    <Header sessionValid={sessionValid} />
    <Routes>
     <Route path="/" element={<Homepage />} /> 
     <Route path="/login" element={<LoginPage />} />

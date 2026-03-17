@@ -10,8 +10,9 @@ const COLORS = {
   gray: '#64748B'
 };
 
-function Header() {
-    const accessToken = sessionStorage.getItem('access_token');
+function Header({ sessionValid = true }) {
+    // When session expires (sessionValid false) or no token, show login – don’t show logout
+    const accessToken = sessionValid && sessionStorage.getItem('access_token');
     const isAdmin = sessionStorage.getItem('is_admin') === 'true';
     const navigate = useNavigate();
     const [statusMessage, setStatusMessage] = useState({ show: false, text: '', type: 'info' });

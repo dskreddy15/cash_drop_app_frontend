@@ -35,6 +35,7 @@ function LoginPage() {
                 sessionStorage.setItem('refresh_token', data.refresh);
                 sessionStorage.setItem('is_admin', String(data.is_admin));
                 setMessage("Login successful!");
+                window.dispatchEvent(new CustomEvent('sessionRestored'));
                 console.log('Login successful, is_admin:', data.is_admin);
                 navigate(data.is_admin ? '/dashboard' : '/cd-dashboard');
             } else {
