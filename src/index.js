@@ -1,6 +1,7 @@
 import React from 'react';
 import 'react-router-dom';
 import ReactDOM from 'react-dom/client';
+import './config/api'; // Install global fetch wrapper for 401 → logout and redirect to login
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';

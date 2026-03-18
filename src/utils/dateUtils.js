@@ -179,7 +179,9 @@ export const formatPSTDateWithTime = (selectedDateStr, timestampStr, options = {
   if (!selectedDateStr) return timestampStr ? formatTimePST(timestampStr) : '';
   const datePart = formatPSTDate(selectedDateStr, { month: 'short', day: 'numeric', year: 'numeric' });
   if (!timestampStr) return datePart;
-  return `${datePart} at ${formatTimePST(timestampStr)}`;
+  const timePart = formatTimePST(timestampStr);
+  if (!timePart) return datePart;
+  return `${datePart} at ${timePart}`;
 };
 
 /**

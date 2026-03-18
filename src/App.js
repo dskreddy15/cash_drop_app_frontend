@@ -9,6 +9,7 @@ import CdDashboard from './Pages/CdDashboard.js';
 import Dashboard from './Pages/Dashboard.js';
 import CashDropReconcilerPage from './Pages/CdValidation.js';
 import BankDrop from './Pages/BankDrop.js';
+import ProtectedRoute from './components/ProtectedRoute';
 import { API_ENDPOINTS, clearSessionAndRedirectToLogin } from './config/api';
 
 function App() {
@@ -97,14 +98,14 @@ function App() {
    <>
     <Header sessionValid={sessionValid} />
    <Routes>
-    <Route path="/" element={<Homepage />} /> 
+    <Route path="/" element={<Homepage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
-    <Route path="/cash-drop" element={<CashDrop />} /> 
-    <Route path="/dashboard" element={<Dashboard />} />
-    <Route path="/cd-dashboard" element={<CdDashboard />} />
-    <Route path="/cd-validation" element={<CashDropReconcilerPage />} />
-    <Route path="/bank-drop" element={<BankDrop />} />
+    <Route path="/cash-drop" element={<ProtectedRoute><CashDrop /></ProtectedRoute>} />
+    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/cd-dashboard" element={<ProtectedRoute><CdDashboard /></ProtectedRoute>} />
+    <Route path="/cd-validation" element={<ProtectedRoute><CashDropReconcilerPage /></ProtectedRoute>} />
+    <Route path="/bank-drop" element={<ProtectedRoute><BankDrop /></ProtectedRoute>} />
    </Routes>
    </>
   );

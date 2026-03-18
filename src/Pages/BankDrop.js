@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { API_ENDPOINTS } from "../config/api";
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, formatPSTDate } from '../utils/dateUtils';
+import { CashDenominationDisplay, BILLS_DENOMINATIONS, COINS_ROLLS_DENOMINATIONS } from '../components/CashDenominationDisplay';
+
+function totalsObjectToRecord(totals) {
+  if (!totals) return {};
+  const r = {};
+  [...BILLS_DENOMINATIONS, ...COINS_ROLLS_DENOMINATIONS].forEach((d) => {
+    r[d.name] = Number(totals[d.name]) || 0;
+  });
+  return r;
+}
 
 const DENOMINATION_CONFIG = [
   { name: 'Hundreds', value: 100, field: 'hundreds', display: 'Hundreds ($100)' },
@@ -60,6 +70,9 @@ const BankDrop = () => {
   const [expandedBatchForDenoms, setExpandedBatchForDenoms] = useState(null);
   const [batchDenomCache, setBatchDenomCache] = useState({});
   const [loadingBatchDenoms, setLoadingBatchDenoms] = useState(null);
+  const [activeSection, setActiveSection] = useState('bank_drop'); // 'bank_drop' | 'history'
+  const [historySummaryData, setHistorySummaryData] = useState(null);
+  const [loadingHistorySummary, setLoadingHistorySummary] = useState(false);
 
   const showStatusMessage = (text, type = 'info') => {
     setStatusMessage({ show: true, text, type });
@@ -440,6 +453,36 @@ const BankDrop = () => {
     fetchBatchView();
   }, [selectedBatchNumbers]);
 
+  // When History is active and batches are selected, fetch denomination summary for left half
+  useEffect(() => {
+    if (activeSection !== 'history' || selectedBatchNumbers.size === 0) {
+      setHistorySummaryData(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingHistorySummary(true);
+    const token = sessionStorage.getItem('access_token');
+    fetch(API_ENDPOINTS.BANK_DROP_SUMMARY, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ batch_numbers: Array.from(selectedBatchNumbers) })
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((summary) => {
+        if (!cancelled && summary) setHistorySummaryData(summary);
+      })
+      .catch(() => {
+        if (!cancelled) setHistorySummaryData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistorySummary(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeSection, selectedBatchNumbers]);
+
   const selectedPendingCount = getSelectedPendingIds().length;
   const canGetSummary = hasBatchSelection || selectedPendingCount > 0;
   const canDropBatch = !hasBatchSelection && (batchFilter === 'all' || batchFilter === 'pending') && selectedPendingCount > 0;
@@ -562,8 +605,37 @@ const BankDrop = () => {
         </div>
       )}
 
-      <div className="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-6 px-2 md:px-4">
-        {/* LEFT: main list */}
+      <div className="max-w-[1800px] mx-auto flex flex-col gap-4 px-2 md:px-4">
+        {/* Section toggle: Bank Drop | History */}
+        <div className="flex rounded-lg border-2 border-gray-200 overflow-hidden bg-white shadow-sm w-full max-w-md">
+          <button
+            type="button"
+            onClick={() => setActiveSection('bank_drop')}
+            className={`flex-1 py-3 px-6 font-black uppercase tracking-tight transition ${activeSection === 'bank_drop' ? 'text-white' : 'bg-gray-50'}`}
+            style={{
+              fontSize: '16px',
+              backgroundColor: activeSection === 'bank_drop' ? COLORS.magenta : 'transparent',
+              color: activeSection === 'bank_drop' ? '#fff' : COLORS.gray
+            }}
+          >
+            Bank Drop
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('history')}
+            className={`flex-1 py-3 px-6 font-black uppercase tracking-tight transition ${activeSection === 'history' ? 'text-white' : 'bg-gray-50'}`}
+            style={{
+              fontSize: '16px',
+              backgroundColor: activeSection === 'history' ? COLORS.magenta : 'transparent',
+              color: activeSection === 'history' ? '#fff' : COLORS.gray
+            }}
+          >
+            History
+          </button>
+        </div>
+
+        {/* BANK DROP: main list (only when Bank Drop active) */}
+        {activeSection === 'bank_drop' && (
         <div className="flex-1 min-w-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
         
         {/* HEADER & FILTERS */}
@@ -784,140 +856,164 @@ const BankDrop = () => {
           </table>
         </div>
         </div>
+        )}
 
-        {/* RIGHT: History - select batches to see them in the list */}
-        <div className="lg:w-[520px] flex-shrink-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-100 bg-gray-50/80 flex flex-row justify-between items-start gap-3">
-            <div className="min-w-0">
-              <h3 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '18px', color: COLORS.gray }}>History</h3>
-              <p className="text-xs font-bold tracking-widest uppercase mt-0.5" style={{ color: COLORS.gray }}>Select batch to see entries in list</p>
-              {hasBatchSelection && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedBatchNumbers(new Set())}
-                  className="mt-2 text-xs font-bold underline hover:no-underline"
-                  style={{ color: COLORS.magenta }}
-                >
-                  Clear selection
-                </button>
-              )}
-            </div>
+        {/* HISTORY: left = batch list + cash drops under; right = denominations */}
+        {activeSection === 'history' && (
+        <div className="flex-1 min-w-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 bg-gray-50/80 flex flex-row justify-between items-center gap-3">
+            <h3 className="font-black uppercase italic tracking-tighter" style={{ fontSize: '18px', color: COLORS.gray }}>History</h3>
             <button
               type="button"
               onClick={fetchBatchHistory}
               disabled={loadingHistory}
-              className="flex-shrink-0 px-3 py-1.5 rounded font-bold text-white text-sm disabled:opacity-50"
+              className="px-3 py-1.5 rounded font-bold text-white text-sm disabled:opacity-50"
               style={{ backgroundColor: COLORS.magenta }}
             >
               {loadingHistory ? '...' : 'Refresh'}
             </button>
           </div>
-          <div className="overflow-auto flex-1 min-h-0">
-            <table className="w-full text-left" style={{ fontSize: '13px' }}>
-              <thead className="sticky top-0 bg-gray-50 z-10">
-                <tr className="font-black uppercase border-b" style={{ color: COLORS.gray }}>
-                  <th className="p-2 w-8"></th>
-                  <th className="p-2">Batch#</th>
-                  <th className="p-2">Drops</th>
-                  <th className="p-2">Date</th>
-                  <th className="p-2">Amount</th>
-                  <th className="p-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingHistory ? (
-                  <tr>
-                    <td colSpan="6" className="p-4 text-center font-bold" style={{ color: COLORS.gray }}>Loading...</td>
-                  </tr>
-                ) : batchHistory.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="p-4 text-center italic" style={{ color: COLORS.gray }}>No dropped batches yet</td>
-                  </tr>
-                ) : (
-                  batchHistory.map((row) => (
-                    <React.Fragment key={row.id || row.batch_number}>
-                      <tr
-                        onClick={() => toggleBatchFromHistory(row.batch_number)}
-                        className={`border-b cursor-pointer transition-colors ${selectedBatchNumbers.has(row.batch_number) ? 'bg-pink-100' : 'hover:bg-pink-50/30'}`}
-                      >
-                        <td className="p-2" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedBatchNumbers.has(row.batch_number)}
-                            onChange={() => toggleBatchFromHistory(row.batch_number)}
-                            className="w-4 h-4"
-                            style={{ accentColor: COLORS.magenta }}
-                          />
-                        </td>
-                        <td className="p-2 font-bold" style={{ color: COLORS.magenta }}>{row.batch_number}</td>
-                        <td className="p-2" style={{ color: COLORS.gray }}>{row.drop_count}</td>
-                        <td className="p-2 text-xs" style={{ color: COLORS.gray }}>
-                          {row.created_at ? new Date(row.created_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
-                        </td>
-                        <td className="p-2 font-bold" style={{ color: COLORS.yellowGreen }}>
-                          {row.batch_drop_amount != null ? `$${Number(row.batch_drop_amount).toFixed(2)}` : '—'}
-                        </td>
-                        <td className="p-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => toggleBatchDenoms(row.batch_number)}
-                            disabled={loadingBatchDenoms === row.batch_number}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors disabled:opacity-50"
-                            style={{ color: COLORS.gray }}
-                            title="View batch denominations"
-                          >
-                            {expandedBatchForDenoms === row.batch_number ? '−' : '+'}
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedBatchForDenoms === row.batch_number && (
-                        <tr className="bg-gray-50 border-b">
-                          <td colSpan="6" className="p-4">
-                            {loadingBatchDenoms === row.batch_number ? (
-                              <p className="text-center font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Loading denominations...</p>
-                            ) : batchDenomCache[row.batch_number] ? (
-                              <div className="bg-white border rounded-lg p-4 max-w-md">
-                                <h4 className="font-black uppercase mb-3 tracking-widest border-b pb-2" style={{ fontSize: '16px', color: COLORS.gray }}>
-                                  Batch denominations
-                                </h4>
-                                <div className="grid grid-cols-2 gap-2 mb-3">
-                                  {DENOMINATION_CONFIG.map(denom => {
-                                    const count = batchDenomCache[row.batch_number].totals[denom.field] || 0;
-                                    return (
-                                      <div key={denom.field} className="flex justify-between text-xs bg-gray-50 p-2 rounded border">
-                                        <span style={{ color: COLORS.gray, fontSize: '13px' }}>{denom.display}</span>
-                                        <span className="font-bold" style={{ fontSize: '13px' }}>{count}</span>
-                                      </div>
-                                    );
-                                  })}
-                                  {ROLLS_CONFIG.map(r => {
-                                    const count = batchDenomCache[row.batch_number].totals[r.field] || 0;
-                                    return (
-                                      <div key={r.field} className="flex justify-between text-xs bg-gray-50 p-2 rounded border">
-                                        <span style={{ color: COLORS.gray, fontSize: '13px' }}>{r.display}</span>
-                                        <span className="font-bold" style={{ fontSize: '13px' }}>{count}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
-                                  <span className="font-bold" style={{ fontSize: '14px', color: COLORS.gray }}>Total:</span>
-                                  <span className="font-black" style={{ fontSize: '16px', color: COLORS.yellowGreen }}>
-                                    ${(batchDenomCache[row.batch_number].total_amount || 0).toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                            ) : null}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 flex-1 min-h-0 overflow-hidden">
+            {/* Left: batch list, then cash drops in batch (under) */}
+            <div className="flex flex-col min-h-0 border-r border-gray-200 overflow-hidden">
+              <div className="p-3 border-b border-gray-100 flex flex-row justify-between items-center">
+                <span className="font-bold uppercase text-sm" style={{ color: COLORS.gray }}>Select batch →</span>
+                {hasBatchSelection && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchNumbers(new Set())}
+                    className="text-xs font-bold underline hover:no-underline"
+                    style={{ color: COLORS.magenta }}
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+              <div className="overflow-auto flex-1 min-h-0 p-3" style={{ minHeight: 0 }}>
+                <table className="w-full text-left min-w-[240px]" style={{ fontSize: '13px' }}>
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="font-black uppercase border-b" style={{ color: COLORS.gray }}>
+                      <th className="p-2 w-8"></th>
+                      <th className="p-2">Batch#</th>
+                      <th className="p-2">Drops</th>
+                      <th className="p-2 hidden sm:table-cell">Date</th>
+                      <th className="p-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingHistory ? (
+                      <tr><td colSpan="5" className="p-4 text-center font-bold" style={{ color: COLORS.gray }}>Loading...</td></tr>
+                    ) : batchHistory.length === 0 ? (
+                      <tr><td colSpan="5" className="p-4 text-center italic" style={{ color: COLORS.gray }}>No dropped batches yet</td></tr>
+                    ) : (
+                      batchHistory.map((row) => (
+                        <tr
+                          key={row.id || row.batch_number}
+                          onClick={() => toggleBatchFromHistory(row.batch_number)}
+                          className={`border-b cursor-pointer transition-colors ${selectedBatchNumbers.has(row.batch_number) ? 'bg-pink-100' : 'hover:bg-pink-50/30'}`}
+                        >
+                          <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedBatchNumbers.has(row.batch_number)}
+                              onChange={() => toggleBatchFromHistory(row.batch_number)}
+                              className="w-4 h-4"
+                              style={{ accentColor: COLORS.magenta }}
+                            />
+                          </td>
+                          <td className="p-2 font-bold" style={{ color: COLORS.magenta }}>{row.batch_number}</td>
+                          <td className="p-2" style={{ color: COLORS.gray }}>{row.drop_count}</td>
+                          <td className="p-2 text-xs hidden sm:table-cell" style={{ color: COLORS.gray }}>
+                            {row.created_at ? new Date(row.created_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                          </td>
+                          <td className="p-2 font-bold" style={{ color: COLORS.yellowGreen }}>
+                            {row.batch_drop_amount != null ? `$${Number(row.batch_drop_amount).toFixed(2)}` : '—'}
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* Cash drops in batch (under the batch list) */}
+              <div className="border-t border-gray-200 flex flex-col min-h-0 flex-1 overflow-hidden">
+                <div className="p-3 border-b border-gray-100 flex-shrink-0">
+                  <span className="font-bold uppercase text-sm" style={{ color: COLORS.gray }}>Cash drops in batch</span>
+                </div>
+                <div className="overflow-auto flex-1 min-h-0 p-2">
+                  {!hasBatchSelection ? (
+                    <p className="p-4 text-center italic" style={{ color: COLORS.gray, fontSize: '14px' }}>Select batch(es) above to see cash drops here.</p>
+                  ) : loadingBatchView ? (
+                    <p className="p-4 text-center font-bold" style={{ color: COLORS.gray, fontSize: '14px' }}>Loading...</p>
+                  ) : batchViewData.length === 0 ? (
+                    <p className="p-4 text-center italic" style={{ color: COLORS.gray, fontSize: '14px' }}>No drops in selected batch(es).</p>
+                  ) : (
+                    <table className="w-full text-left min-w-[320px]" style={{ fontSize: '13px' }}>
+                      <thead className="sticky top-0 bg-gray-50 z-10">
+                        <tr className="font-black uppercase border-b" style={{ color: COLORS.gray }}>
+                          <th className="p-2 md:p-3" style={{ fontSize: '12px' }}>Batch#</th>
+                          <th className="p-2 md:p-3" style={{ fontSize: '12px' }}>Date / Register / Shift</th>
+                          <th className="p-2 md:p-3" style={{ fontSize: '12px' }}>Reconciled Amount</th>
+                          <th className="p-2 md:p-3" style={{ fontSize: '12px' }}>Receipt Amt</th>
+                          <th className="p-2 md:p-3" style={{ fontSize: '12px' }}>Delta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchViewData.map((item) => (
+                          <tr key={item.id} className="border-b hover:bg-pink-50/30">
+                            <td className="p-2 md:p-3 font-bold" style={{ color: COLORS.gray }}>{item.bank_drop_batch_number || '—'}</td>
+                            <td className="p-2 md:p-3">
+                              <div className="font-black" style={{ fontSize: '13px' }}>{formatPSTDate(item.date)}</div>
+                              <div className="font-bold uppercase" style={{ color: COLORS.magenta, fontSize: '12px' }}>{item.workstation} | Shift {item.shift_number}</div>
+                              <div style={{ color: COLORS.gray, fontSize: '12px' }}>{item.user_name}</div>
+                            </td>
+                            <td className="p-2 md:p-3">
+                              {item.label_image_url ? (
+                                <button type="button" onClick={() => setSelectedImage(item.label_image_url)} className="font-bold border-b border-dotted hover:text-pink-600" style={{ color: COLORS.gray }}>
+                                  ${item.reconciled_amount || item.admin_count_amount || item.system_drop_amount}
+                                </button>
+                              ) : (
+                                <span className="font-bold" style={{ color: COLORS.gray }}>${item.reconciled_amount || item.admin_count_amount || item.system_drop_amount}</span>
+                              )}
+                            </td>
+                            <td className="p-2 md:p-3 font-bold" style={{ color: COLORS.gray }}>${item.ws_label_amount}</td>
+                            <td className={`p-2 md:p-3 font-bold ${parseFloat(item.reconcile_delta) !== 0 ? 'text-red-500' : 'text-gray-400'}`}>${item.reconcile_delta}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* Right: denominations */}
+            <div className="flex flex-col min-h-0 overflow-hidden">
+              <div className="p-4 overflow-auto flex-1 min-h-0 bg-gray-50/50">
+                <h4 className="font-black uppercase text-sm mb-3 tracking-widest" style={{ color: COLORS.gray }}>Denominations</h4>
+                {!hasBatchSelection ? (
+                  <p className="text-sm italic" style={{ color: COLORS.gray }}>Select one or more batches to see totals.</p>
+                ) : loadingHistorySummary ? (
+                  <p className="text-sm font-bold" style={{ color: COLORS.gray }}>Loading...</p>
+                ) : historySummaryData ? (
+                  <div className="bg-white border rounded-lg p-4 overflow-x-auto">
+                    <CashDenominationDisplay
+                      record={totalsObjectToRecord(historySummaryData.totals)}
+                      title={selectedBatchNumbers.size > 1 ? `Totals (${selectedBatchNumbers.size} batches)` : 'Batch totals'}
+                      grayColor={COLORS.gray}
+                      magentaColor={COLORS.magenta}
+                    />
+                    <p className="text-xs mt-2 font-bold" style={{ color: COLORS.yellowGreen }}>
+                      Total: ${(historySummaryData.total_amount ?? 0).toFixed(2)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm italic" style={{ color: COLORS.gray }}>No summary data.</p>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* SUMMARY MODAL */}
@@ -942,37 +1038,13 @@ const BankDrop = () => {
               Total Cash Drops: {summaryData.count} | Total Amount: <span className="font-black" style={{ color: COLORS.yellowGreen, fontSize: '18px' }}>${(summaryData.total_amount ?? 0).toFixed(2)}</span>
             </p>
 
-            <div className="mb-6">
-              <h4 className="font-bold mb-3" style={{ fontSize: '18px', color: COLORS.gray }}>Denomination Totals:</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {DENOMINATION_CONFIG.map(denom => {
-                  const count = summaryData.totals[denom.field] || 0;
-                  return (
-                    <div key={denom.field} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                      <span className="font-bold" style={{ fontSize: '14px' }}>{count}</span>
-                    </div>
-                  );
-                })}
-                {ROLLS_CONFIG.map(r => {
-                  const count = summaryData.totals[r.field] || 0;
-                  return (
-                    <div key={r.field} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{r.display}</span>
-                      <span className="font-bold" style={{ fontSize: '14px' }}>{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mb-6 p-4 rounded-lg border-2" style={{ backgroundColor: COLORS.yellowGreen + '20', borderColor: COLORS.yellowGreen }}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold" style={{ fontSize: '18px', color: COLORS.gray }}>Grand Total:</span>
-                <span className="font-black" style={{ fontSize: '24px', color: COLORS.yellowGreen }}>
-                  ${summaryData.total_amount.toFixed(2)}
-                </span>
-              </div>
+            <div className="mb-6 overflow-x-auto">
+              <CashDenominationDisplay
+                record={totalsObjectToRecord(summaryData.totals)}
+                title="Denomination totals (bills | coins & rolls)"
+                grayColor={COLORS.gray}
+                magentaColor={COLORS.yellowGreen}
+              />
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">

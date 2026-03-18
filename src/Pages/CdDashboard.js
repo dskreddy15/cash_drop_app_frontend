@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
+import { CashDenominationDisplay } from '../components/CashDenominationDisplay';
 import { getPSTDate, getPSTWeekStart, getPSTMonthStart, getPSTMonthEnd, getPSTYearStart, formatPSTDate, formatPSTDateWithTime } from '../utils/dateUtils';
 
 function CdDashboard() {
@@ -432,7 +433,7 @@ function CdDashboard() {
                                 <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.magenta }}>${drop.drop_amount}</span>
                               </div>
                               <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>
-                                Register: {drop.workstation} | {drop.user_name}
+                                Shift: {drop.shift_number} · Register: {drop.workstation} | {drop.user_name}
                               </div>
                               {drop.status === 'drafted' && drop.created_at && (
                                 <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
@@ -442,14 +443,6 @@ function CdDashboard() {
                               {drop.submitted_at && (
                                 <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
                                   Submitted: {formatSubmittedOrSaved(drop.date, drop.submitted_at)}
-                                </div>
-                              )}
-                              {drop.variance !== undefined && drop.variance !== null && (
-                                <div className="mb-3 md:mb-4">
-                                  <span className="text-xs font-bold uppercase mr-2" style={{ color: COLORS.gray, fontSize: '14px' }}>Variance:</span>
-                                  <span className={`font-bold ${parseFloat(drop.variance) !== 0 ? 'text-red-500' : 'text-gray-400'}`} style={{ fontSize: '14px' }}>
-                                    ${parseFloat(drop.variance).toFixed(2)}
-                                  </span>
                                 </div>
                               )}
                               {drop.notes && (
@@ -501,25 +494,13 @@ function CdDashboard() {
                                   )}
                                 </div>
                               )}
-                              <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
-                                {DENOMINATION_CONFIG.map(denom => {
-                                  const value = drop[denom.name] || 0;
-                                  return (
-                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
-                                    </div>
-                                  );
-                                })}
-                                {ROLLS_DISPLAY.map(denom => {
-                                  const value = drop[denom.name] || 0;
-                                  return (
-                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
-                                    </div>
-                                  );
-                                })}
+                              <div className="mt-auto pt-4 border-t border-gray-200 space-y-3">
+                                <CashDenominationDisplay
+                                  record={drop}
+                                  title={drop.status === 'reconciled' ? 'Counted total (final denominations)' : 'Cash drop total'}
+                                  grayColor={COLORS.gray}
+                                  magentaColor={COLORS.magenta}
+                                />
                               </div>
                             </div>
                           ) : <div className="h-full bg-gray-50/30 rounded-lg border border-dashed border-gray-200"></div>}
@@ -542,11 +523,14 @@ function CdDashboard() {
                                 <div className="absolute top-0 right-0 bg-yellow-500 text-white px-3 py-1 text-xs font-black uppercase tracking-widest transform rotate-12 translate-x-2 -translate-y-1 z-10" style={{ fontSize: '12px' }}>BANK DROPPED</div>
                               ) : null}
                               <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4 gap-2">
-                                <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '14px' }}>Register {drawer.workstation}</span>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: COLORS.yellowGreen + '20', color: COLORS.yellowGreen, fontSize: '14px' }}>Shift {drawer.shift_number}</span>
                                 <span className="text-xl md:text-2xl font-bold tracking-tighter" style={{ color: COLORS.yellowGreen }}>${drawer.total_cash}</span>
                               </div>
+                              <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gray, fontSize: '14px' }}>
+                                Shift: {drawer.shift_number} · Register: {drawer.workstation} | {drawer.user_name}
+                              </div>
                               <div className="text-xs font-bold uppercase mb-3 md:mb-4" style={{ color: COLORS.gray, fontSize: '14px' }}>
-                                Initial: ${drawer.starting_cash} | {drawer.user_name}
+                                Initial: ${drawer.starting_cash}
                               </div>
                               {(!drop && drawer.status === 'drafted' && drawer.created_at) && (
                                 <div className="text-xs mb-3 md:mb-4 italic" style={{ color: COLORS.gray, fontSize: '14px' }}>
@@ -590,25 +574,13 @@ function CdDashboard() {
                                   </button>
                                 </div>
                               )}
-                              <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-gray-200">
-                                {DENOMINATION_CONFIG.map(denom => {
-                                  const value = drawer[denom.name] || 0;
-                                  return (
-                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
-                                    </div>
-                                  );
-                                })}
-                                {ROLLS_DISPLAY.map(denom => {
-                                  const value = drawer[denom.name] || 0;
-                                  return (
-                                    <div key={denom.name} className="flex justify-between text-xs bg-white p-1.5 px-2 rounded border border-gray-100">
-                                      <span style={{ color: COLORS.gray, fontSize: '14px' }}>{denom.display}</span>
-                                      <span className="font-bold" style={{ fontSize: '14px' }}>{value}</span>
-                                    </div>
-                                  );
-                                })}
+                              <div className="mt-auto pt-4 border-t border-gray-200">
+                                <CashDenominationDisplay
+                                  record={drawer}
+                                  title="Drawer denominations"
+                                  grayColor={COLORS.gray}
+                                  magentaColor={COLORS.yellowGreen}
+                                />
                               </div>
                             </div>
                           ) : <div className="h-full bg-gray-50/30 rounded-lg border border-dashed border-gray-200"></div>}
