@@ -1081,11 +1081,10 @@ function CashDrop() {
               ) : (
                 <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
                   <p className="font-black text-red-500 leading-relaxed" style={{ fontSize: '14px' }}>
-                    {parseFloat(calculateDropAmount()) <= 0 && "• Drop Amount must be positive"}<br/>
-                    {formData.workStation === '' && "• Register Number is required"}<br/>
-                    {formData.shiftNumber === '' && "• Shift Number is required"}<br/>
-                    {formData.startingCash === '' && "• Starting Cash is required"}<br/>
-                    {formData.cashReceivedOnReceipt === '' && "• Cash Received on Receipt is required"}<br/>
+                    {parseFloat(calculateDropAmount()) <= 0 && "Drop Amount must be positive"}<br/>
+                    {formData.workStation === '' && "Register Number is required"}<br/>
+                    {formData.shiftNumber === '' && "Shift Number is required"}<br/>
+                    {formData.cashReceivedOnReceipt === '' && "Cash Received on Receipt is required"}
                   </p>
                 </div>
               )}
