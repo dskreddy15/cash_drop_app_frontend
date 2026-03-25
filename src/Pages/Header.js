@@ -89,39 +89,49 @@ function Header({ sessionValid = true }) {
             )}
 
             <div className="bg-gray-100 rounded-md p-2" style={{ fontFamily: 'Calibri, Verdana, sans-serif' }}>
-                {/* Desktop Navigation */}
-                <nav className="hidden md:block text-center font-bold mb-2" style={{ fontSize: '24px', color: COLORS.magenta }}>
+                {/* Desktop Navigation — flex-wrap so links stay visible on narrow viewports */}
+                <nav className="hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-2 text-center font-bold mb-2 px-1" style={{ fontSize: '24px', color: COLORS.magenta }}>
                     {accessToken ? (
                         <>
-                            <Link to="/cash-drop" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop</Link>
-                            <Link to="/cd-dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
-                            <Link to="/odoo" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Shop</Link>
+                            <Link to="/cash-drop" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop</Link>
+                            <Link to="/cd-dashboard" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
+                            <Link to="/odoo" className="inline-block py-2 px-1 transition hover:underline font-black" style={{ color: COLORS.magenta, fontSize: '18px' }}>Shop</Link>
                             {isAdmin && (
-                                <Link to="/dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Admin Dashboard</Link>
+                                <Link to="/dashboard" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Admin Dashboard</Link>
                             )}
                             {isAdmin && (
-                                <Link to="/cd-validation" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Validation</Link>
+                                <Link to="/cd-validation" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Validation</Link>
                             )}
                             {isAdmin && (
-                                <Link to="/bank-drop" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Bank Drop</Link>
+                                <Link to="/bank-drop" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Bank Drop</Link>
                             )}
-                            <button onClick={handleLogout} className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Logout</button>
+                            <button type="button" onClick={handleLogout} className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Logout</button>
                         </>
                     ) : (
                         <>
-                            <Link to="/login" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Login</Link>
-                            <Link to="/cash-drop" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop</Link>
-                            <Link to="/cd-dashboard" className="m-3 p-3 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
+                            <Link to="/login" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Login</Link>
+                            <Link to="/cash-drop" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop</Link>
+                            <Link to="/cd-dashboard" className="inline-block py-2 px-1 transition hover:underline" style={{ color: COLORS.magenta, fontSize: '18px' }}>Cash Drop Dashboard</Link>
+                            <Link to="/odoo" className="inline-block py-2 px-1 transition hover:underline font-black" style={{ color: COLORS.magenta, fontSize: '18px' }}>Shop</Link>
                         </>
                     )}
                 </nav>
 
-                {/* Mobile Navigation */}
+                {/* Mobile Navigation — Shop always visible; rest in hamburger */}
                 <div className="md:hidden">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
+                        <Link
+                            to="/odoo"
+                            className="font-black px-3 py-2 rounded-lg border-2 transition hover:opacity-90 shrink-0"
+                            style={{ color: COLORS.magenta, borderColor: COLORS.magenta, fontSize: '16px' }}
+                        >
+                            Shop
+                        </Link>
+                        <div className="flex items-center gap-2 min-w-0">
                         <button
+                            type="button"
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="p-2 rounded-md transition"
+                            className="p-2 rounded-md transition shrink-0"
                             style={{ color: COLORS.magenta }}
                             aria-label="Toggle menu"
                         >
@@ -135,7 +145,8 @@ function Header({ sessionValid = true }) {
                                 </svg>
                             )}
                         </button>
-                        <span className="font-bold" style={{ fontSize: '18px', color: COLORS.magenta }}>Menu</span>
+                        <span className="font-bold truncate" style={{ fontSize: '18px', color: COLORS.magenta }}>Menu</span>
+                        </div>
                     </div>
 
                     {/* Mobile Menu Dropdown */}
@@ -233,6 +244,14 @@ function Header({ sessionValid = true }) {
                                         style={{ color: COLORS.magenta, fontSize: '16px' }}
                                     >
                                         Cash Drop Dashboard
+                                    </Link>
+                                    <Link 
+                                        to="/odoo" 
+                                        onClick={handleLinkClick}
+                                        className="block p-3 rounded transition hover:bg-gray-200 font-black" 
+                                        style={{ color: COLORS.magenta, fontSize: '16px' }}
+                                    >
+                                        Shop
                                     </Link>
                                 </>
                             )}
