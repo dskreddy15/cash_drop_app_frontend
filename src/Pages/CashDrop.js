@@ -454,21 +454,35 @@ function CashDrop() {
     setRemainingCashInDrawer(finalDrawer);
   };
 
+  // Whether selected date is allowed for this user (API + non-admins cannot use past days)
+  const pstToday = getPSTDate();
+  const selectedDateInfo = calendarDates.find(d => d.date === formData.date);
+  const rawCanCashDrop = selectedDateInfo ? selectedDateInfo.canCashDrop : null;
+  const isPastDaySelected = !!(formData.date && formData.date < pstToday);
+  const isSelectedDateAllowed =
+    rawCanCashDrop === false
+      ? false
+      : rawCanCashDrop === true && isPastDaySelected && !isAdmin
+        ? false
+        : rawCanCashDrop;
+
   const isSubmitValid = () => {
     const drop = parseFloat(calculateDropAmount());
     const mathCheck = Math.abs(drop - (parseFloat(calculateTotalCash()) - parseFloat(formData.startingCash))) < 0.01;
     const hasReceiptImage = !!(labelImage || labelImageUrl);
     const imageOk = !adminSettings.cash_drop_receipt_image_required || hasReceiptImage;
-    return mathCheck && drop > 0 && formData.workStation && imageOk;
+    return (
+      mathCheck &&
+      drop > 0 &&
+      formData.workStation &&
+      imageOk &&
+      isSelectedDateAllowed !== false
+    );
   };
-
-  // Whether selected date is allowed for cash drop (from calendar API)
-  const selectedDateInfo = calendarDates.find(d => d.date === formData.date);
-  const isSelectedDateAllowed = selectedDateInfo ? selectedDateInfo.canCashDrop : null; // null = unknown (e.g. loading)
 
   const handleSaveDraft = async () => {
     if (isSelectedDateAllowed === false) {
-      showStatusMessage('Cash drop is not allowed for this date (check admin settings).', 'error');
+      showStatusMessage('Cash drop is not allowed for this date.', 'error');
       return;
     }
     const token = sessionStorage.getItem('access_token');
@@ -679,7 +693,7 @@ function CashDrop() {
 
   const handleSubmit = async () => {
     if (isSelectedDateAllowed === false) {
-      showStatusMessage('Cash drop is not allowed for this date (check admin settings).', 'error');
+      showStatusMessage('Cash drop is not allowed for this date.', 'error');
       return;
     }
     if (adminSettings.cash_drop_receipt_image_required && !labelImage && !labelImageUrl) {
@@ -969,20 +983,23 @@ function CashDrop() {
                           const first = new Date(pickerView.year, pickerView.month - 1, 1);
                           const startPad = first.getDay();
                           const daysInMonth = new Date(pickerView.year, pickerView.month, 0).getDate();
-                          const today = getPSTDate();
                           const cells = [];
                           for (let i = 0; i < startPad; i++) cells.push(<span key={`pad-${i}`} />);
                           for (let d = 1; d <= daysInMonth; d++) {
                             const dateStr = `${pickerView.year}-${String(pickerView.month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             const info = calendarDates.find(x => x.date === dateStr);
-                            const isCurrent = dateStr === today;
-                            const canDrop = info?.canCashDrop;
+                            const isCurrent = dateStr === pstToday;
+                            const isPastDay = dateStr < pstToday;
+                            const apiCan = info?.canCashDrop;
+                            const canDrop =
+                              apiCan === true && isPastDay && !isAdmin ? false : apiCan;
                             const isSelected = formData.date === dateStr;
                             let bg = 'bg-gray-100';
                             if (isCurrent) bg = 'bg-blue-500 text-white';
-                            else if (canDrop === true) bg = 'bg-green-500 text-white';
                             else if (canDrop === false) bg = 'bg-red-500 text-white';
-                            const isFuture = dateStr > today;
+                            else if (canDrop === true) bg = 'bg-green-500 text-white';
+                            const isFuture = dateStr > pstToday;
+                            const title = info ? (canDrop ? 'Can add cash drop' : 'Cannot add cash drop') : dateStr;
                             cells.push(
                               <button
                                 key={dateStr}
@@ -994,7 +1011,7 @@ function CashDrop() {
                                 }}
                                 disabled={isFuture}
                                 className={`py-1.5 rounded ${bg} ${isSelected ? 'ring-2 ring-offset-1 ring-black' : ''} ${isFuture ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
-                                title={info ? (canDrop ? 'Can add cash drop' : 'Cannot add cash drop') : dateStr}
+                                title={title}
                               >
                                 {d}
                               </button>
@@ -1033,7 +1050,7 @@ function CashDrop() {
           )}
 
           {/* Early warning: cannot add cash drop for this date (show as soon as shift + workstation + date are set) */}
-          {formData.shiftNumber && formData.workStation && formData.date && selectedDateInfo && selectedDateInfo.canCashDrop === false && (
+          {formData.shiftNumber && formData.workStation && formData.date && selectedDateInfo && isSelectedDateAllowed === false && (
             <div
               className="mb-6 p-4 rounded-lg"
               role="alert"
@@ -1047,7 +1064,7 @@ function CashDrop() {
                 You cannot add a cash drop for this date.
               </p>
               <p style={{ fontSize: '13px', margin: 0 }}>
-                The selected date ({formData.date}) is not allowed by current admin settings (allowed date range or bank drop rule). Choose a different date from the calendar above or contact an admin.
+                The selected date ({formData.date}) cannot be used for a cash drop. Choose a different date from the calendar above or contact an admin.
               </p>
             </div>
           )}
@@ -1206,14 +1223,15 @@ function CashDrop() {
                     {parseFloat(calculateDropAmount()) <= 0 && "Drop Amount must be positive"}<br/>
                     {formData.workStation === '' && "Register Number is required"}<br/>
                     {formData.shiftNumber === '' && "Shift Number is required"}<br/>
-                    {formData.cashReceivedOnReceipt === '' && "Cash Received on Receipt is required"}
+                    {formData.cashReceivedOnReceipt === '' && "Cash Received on Receipt is required"}<br/>
+                    {isSelectedDateAllowed === false && "This date is not allowed for cash drops."}
                   </p>
                 </div>
               )}
                 <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={handleSaveDraft} 
-                    disabled={isSubmitting || !formData.workStation || !formData.shiftNumber}
+                    disabled={isSubmitting || !formData.workStation || !formData.shiftNumber || isSelectedDateAllowed === false}
                     className="py-3 md:py-4 text-white font-black rounded-lg shadow-lg transform transition active:scale-95 uppercase tracking-widest disabled:bg-gray-400 disabled:cursor-not-allowed" 
                     style={{ backgroundColor: COLORS.gray, fontSize: '18px' }}
                   >
