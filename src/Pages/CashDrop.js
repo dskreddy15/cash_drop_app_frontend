@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
-import { getPSTDate } from '../utils/dateUtils';
+import { getPSTDate, getPSTYesterday } from '../utils/dateUtils';
 
 function CashDrop() {
   const navigate = useNavigate();
@@ -454,15 +454,17 @@ function CashDrop() {
     setRemainingCashInDrawer(finalDrawer);
   };
 
-  // Whether selected date is allowed for this user (API + non-admins cannot use past days)
+  // Whether selected date is allowed for this user (API + non-admins limited to today & yesterday PST)
   const pstToday = getPSTDate();
+  const pstYesterday = getPSTYesterday();
   const selectedDateInfo = calendarDates.find(d => d.date === formData.date);
   const rawCanCashDrop = selectedDateInfo ? selectedDateInfo.canCashDrop : null;
-  const isPastDaySelected = !!(formData.date && formData.date < pstToday);
+  const inNonAdminAllowedWindow =
+    formData.date === pstToday || formData.date === pstYesterday;
   const isSelectedDateAllowed =
     rawCanCashDrop === false
       ? false
-      : rawCanCashDrop === true && isPastDaySelected && !isAdmin
+      : rawCanCashDrop === true && !isAdmin && formData.date && !inNonAdminAllowedWindow
         ? false
         : rawCanCashDrop;
 
@@ -989,10 +991,11 @@ function CashDrop() {
                             const dateStr = `${pickerView.year}-${String(pickerView.month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             const info = calendarDates.find(x => x.date === dateStr);
                             const isCurrent = dateStr === pstToday;
-                            const isPastDay = dateStr < pstToday;
                             const apiCan = info?.canCashDrop;
-                            const canDrop =
-                              apiCan === true && isPastDay && !isAdmin ? false : apiCan;
+                            let canDrop = apiCan;
+                            if (apiCan === true && !isAdmin) {
+                              canDrop = dateStr === pstToday || dateStr === pstYesterday;
+                            }
                             const isSelected = formData.date === dateStr;
                             let bg = 'bg-gray-100';
                             if (isCurrent) bg = 'bg-blue-500 text-white';
