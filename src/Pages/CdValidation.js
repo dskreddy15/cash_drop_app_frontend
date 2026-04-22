@@ -413,9 +413,9 @@ function CashDropValidation() {
                 const reconcileNotesRequired = hasDelta && !reconciliationNotesTrim;
                 const reconcileButtonDisabled = !allDenomCheckboxesTicked(item.id) || reconcileNotesRequired;
                 const reconcileButtonTitle = !allDenomCheckboxesTicked(item.id)
-                  ? 'Expand the row and tick every denomination ✓ first'
+                  ? 'Tick every denomination ✓ in the expanded breakdown before reconciling.'
                   : reconcileNotesRequired
-                    ? 'Counted amount differs from cash drop — add reconciliation notes first'
+                    ? 'Reconciliation notes are required: explain the difference between counted amount and cash drop.'
                     : undefined;
                 
                 return (
@@ -525,15 +525,30 @@ function CashDropValidation() {
                           </div>
                         ) : (
                           <div className="flex flex-col gap-2">
-                            <button 
-                              onClick={() => handleReconcile(item)}
-                              disabled={reconcileButtonDisabled}
-                              title={reconcileButtonTitle}
-                              className="text-white font-black px-3 md:px-4 py-2 rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
-                            >
-                              RECONCILE
-                            </button>
+                            {/* Overlay: disabled buttons often do not receive pointer events; instant CSS tooltip (no native title delay). */}
+                            <span className="group relative inline-flex self-start rounded-lg">
+                              <button
+                                type="button"
+                                onClick={() => handleReconcile(item)}
+                                disabled={reconcileButtonDisabled}
+                                className="text-white font-black px-3 md:px-4 py-2 rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: COLORS.magenta, fontSize: '14px' }}
+                              >
+                                RECONCILE
+                              </button>
+                              {reconcileButtonDisabled && reconcileButtonTitle ? (
+                                <>
+                                  <span className="absolute inset-0 z-[1] cursor-help rounded-lg" aria-hidden />
+                                  <span
+                                    role="tooltip"
+                                    className="pointer-events-none absolute left-1/2 bottom-full z-[100] mb-2 w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-md px-2.5 py-1.5 text-left text-xs font-semibold leading-snug opacity-0 shadow-lg group-hover:opacity-100 whitespace-normal border border-white/20"
+                                    style={{ transition: 'none', backgroundColor: COLORS.magenta, color: '#ffffff' }}
+                                  >
+                                    {reconcileButtonTitle}
+                                  </span>
+                                </>
+                              ) : null}
+                            </span>
                             {statusMessages[item.id] && statusMessages[item.id].show && (
                               <div className={`p-2 rounded ${
                                 statusMessages[item.id].type === 'error' ? 'bg-red-50 text-red-700' : 
